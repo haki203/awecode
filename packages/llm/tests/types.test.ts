@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ProviderConfig, AwecodeConfig, ProviderType } from '../src/types.js';
+import type { ProviderConfig, AwecodeConfig } from '../src/types.js';
 
 describe('ProviderConfig types', () => {
   it('accepts anthropic provider with apiKey', () => {
