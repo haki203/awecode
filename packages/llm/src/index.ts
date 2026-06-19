@@ -26,5 +26,7 @@ export type {
 
 export { loadConfig, saveConfig, getDefaultConfigPath } from './config.js';
 export { createProvider } from './providers.js';
+export { chat, streamChat } from './chat.js';
+export type { ChatOptions, ChatResult } from './chat.js';
 
 export const LLM_PACKAGE_VERSION = '0.0.0';
