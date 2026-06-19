@@ -117,9 +117,10 @@ export function parseDiff(input: string): Diff {
 **Quy ước:**
 
 - `file_path` header xác định target file
+- `at: <line>` header (tùy chọn) — chỉ định vị trí insert (mặc định: cuối file)
 - Nhiều block SEARCH/REPLACE trong 1 file → áp dụng tuần tự từ trên xuống
-- Block SEARCH rỗng + REPLACE có nội dung → **insert** tại cuối file
-- Block SEARCH = toàn bộ file + REPLACE rỗng → **delete file**
+- Block SEARCH rỗng + REPLACE có nội dung → **insert** tại vị trí `at` (hoặc cuối file nếu không có)
+- **Delete file:** không dùng diff rỗng (ambiguous với file lớn) — agent phải gọi tool `delete_file: <path>` riêng
 - Có thể có nhiều `file_path` section trong 1 LLM response
 
 ### 4.2 Fuzzy Matching Algorithm
@@ -255,6 +256,15 @@ User chọn sandbox mode qua config `.agentrc.yaml`:
 | `git-only` (default) | Git worktree trong project | Lỗi trong worktree → rollback bằng `git checkout` |
 | `docker` (opt-in) | Worktree trong container Docker | Cô lập hoàn toàn process/filesystem |
 | `isolateNetwork: true` (default ON cho mọi mode) | Block outgoing HTTP từ code LLM sinh | Ngừa LLM gọi API lấy token |
+
+**Network isolation theo mode:**
+
+- **`docker` mode:** Block qua `--network=none` của Docker. Clean.
+- **`git-only` mode (Windows):** Thiết lập Windows Firewall rule tạm thời cho PID của child process (`netsh advfirewall firewall add rule ...`) — cleanup khi process exit. Cần quyền user (không cần admin cho user-scope rule).
+- **`git-only` mode (Linux):** Dùng `unshare -n` (cần user namespace) hoặc `firejail --net=none` nếu có.
+- **`git-only` mode (macOS):** Dùng `sandbox-exec` với profile deny network.
+
+Nếu platform không support (vd Windows cũ không có firewall scope phù hợp), log warning và tiếp tục — agent vẫn cô lập qua git, chỉ mất network block.
 
 **Config `.agentrc.yaml`:**
 
@@ -526,7 +536,7 @@ Khi agent apply diff, TUI chuyển sang **approval mode**:
 - Repo map via tree-sitter
 - Partial-file context (lines range)
 - Docker sandbox mode
-- MCP client cho external tools
+- MCP client cho external tools (mặc dù SDK đã có trong v0.1, integration mới ở v0.2)
 
 ### v0.3+
 
