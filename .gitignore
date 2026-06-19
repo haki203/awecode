@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.yarn/cache
+.yarn/install-state.gz
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Agent workspace
+.agent-ws/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Env
+.env
+.env.local
