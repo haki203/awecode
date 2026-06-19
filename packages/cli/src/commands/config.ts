@@ -28,7 +28,7 @@ Exiting.`);
     return;
   }
 
-  const configPath = getDefaultConfigPath();
+  const configPath = process.env.AWECODE_CONFIG_PATH ?? getDefaultConfigPath();
   await saveConfig(configPath, config);
   console.log(`\n\u2713 Config saved to ${configPath}`);
 }

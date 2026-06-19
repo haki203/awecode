@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { homedir, platform } from 'node:os';
+import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { parse, stringify } from 'yaml';
 import type { AwecodeConfig } from './types.js';
@@ -39,8 +39,5 @@ export async function saveConfig(configPath: string, config: AwecodeConfig): Pro
 
 export function getDefaultConfigPath(): string {
   const home = homedir();
-  if (platform() === 'win32') {
-    return join(home, '.config', 'awecode', 'config.yaml');
-  }
   return join(home, '.config', 'awecode', 'config.yaml');
 }

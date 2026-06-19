@@ -21,7 +21,7 @@ import { loadConfig, chat, getDefaultConfigPath } from '@awecode/llm';
  * can detect the missing-config case via exit status.
  */
 export async function chatTestCommand(): Promise<void> {
-  const configPath = getDefaultConfigPath();
+  const configPath = process.env.AWECODE_CONFIG_PATH ?? getDefaultConfigPath();
   const config = await loadConfig(configPath);
 
   if (!config) {
