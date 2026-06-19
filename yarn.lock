@@ -76,7 +76,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@awecode/llm@workspace:packages/llm":
+"@awecode/cli@workspace:packages/cli":
+  version: 0.0.0-use.local
+  resolution: "@awecode/cli@workspace:packages/cli"
+  dependencies:
+    "@awecode/llm": "workspace:*"
+    "@types/node": "npm:^26.0.0"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^6.0.3"
+  bin:
+    awecode: ./dist/index.js
+  languageName: unknown
+  linkType: soft
+
+"@awecode/llm@workspace:*, @awecode/llm@workspace:packages/llm":
   version: 0.0.0-use.local
   resolution: "@awecode/llm@workspace:packages/llm"
   dependencies:
