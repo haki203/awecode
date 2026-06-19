@@ -10,6 +10,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "cross-env AWECODE_E2E_API_KEY=1 vitest run tests/e2e.test.ts",
     "dev": "tsup --watch"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "cross-env": "^10.1.0",
     "ink-testing-library": "^4.0.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
