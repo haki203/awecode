@@ -547,14 +547,52 @@ Khi agent apply diff, TUI chuyển sang **approval mode**:
 
 ---
 
-## 10. Open Questions (ghi nhận, giải quyết sau)
+## 10. Quyết định License & Package
 
-1. **License chọn gì?** MIT (permissive, dễ attract contributor) hay Apache-2.0 (patent grant)?
-2. **Branding / tên package trên npm?** `awecode` đã có chưa?
-3. **Telemetry / analytics?** Opt-in hay opt-out? (OSS nên opt-in)
-4. **Config file location?** `.agentrc.yaml` trong project root, hay `~/.config/awecode/`?
+### 10.1 License: **Apache-2.0**
 
-Các câu này không block implementation v0.1 — chọn default reasonable (MIT, `awecode` package name, opt-in telemetry, `.agentrc.yaml` local) và quyết định sau.
+Lý do chọn:
+
+- Đa số coding agent OSS dùng Apache-2.0 (Aider, Cline, Continue, Goose, OpenAI Codex CLI, Gemini CLI, Qwen Code)
+- Có **patent grant** — bảo vệ pháp lý cho anh và user
+- Enterprise-friendly — sau này dễ phát triển commercial offering
+- Contributor-friendly — không sợ copyleft viral
+
+File `LICENSE` (Apache 2.0 full text) đặt ở root project. Mỗi source file có header ngắn:
+
+```
+Copyright 2026 [Author Name]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+### 10.2 Package name: **`@awecode/cli`**
+
+- Scoped package (`@awecode/` namespace) — giữ không gian cho future packages: `@awecode/sdk`, `@awecode/diff`, `@awecode/harness`, v.v.
+- Binary name: `awecode` (command user gõ trong terminal)
+- npm organization: `awecode` (cần register trên npmjs.com trước publish)
+
+### 10.3 Config file location
+
+- **Project-local:** `.agentrc.yaml` (hoặc `.agentrc.json`) trong project root — committed to git cho team share
+- **User-global:** `~/.config/awecode/config.yaml` — override cho machine cụ thể (không commit)
+- **Precedence:** CLI flags > env vars > project-local > user-global > defaults
+
+### 10.4 Telemetry
+
+- **Opt-in only** — mặc định OFF
+- Nếu user opt-in (`telemetry: true` trong config): gửi anonymous usage stats (số task, tokens dùng, model, success/fail)
+- Không bao giờ gửi source code của user
 
 ---
 
