@@ -48,6 +48,10 @@ _Avoid_: codebase index (different concept — we don't do vector search), AST (
 The mechanism by which the agent announces which Workflow (if any) to start. Done via the agent emitting a `start_workflow(name)` tool call at the top of its response. Replaces an external classifier LLM.
 _Avoid_: classifier, router
 
+**Compaction**:
+The process of reducing conversation history size by LLM-based summarization. Triggered automatically at 85% (moderate) or 95% (severe) of context budget, or manually via `/smol` slash command. Preserves original task, currently-edited files, last 5 turns, workflow artifact references; discards verbose tool output and redundant reads.
+_Avoid_: compression (overloaded with gzip), summarization (too generic — Compaction is the specific context-window operation)
+
 ## Relationships
 
 - A **Task** runs in exactly one mode at a time: **Direct Mode** or a **Workflow**

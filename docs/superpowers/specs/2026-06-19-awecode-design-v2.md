@@ -4,7 +4,7 @@
 **Trạng thái:** Approved (post-grill — see [Grill Session Notes](#11-grill-session-notes))
 **Scope:** v0.1 — MVP with Workflow Engine + Harness + Self-heal
 
-**Changelog from v2:** Added Direct Mode terminology, `.awecode/` consolidated directory layout, Workflow phases artifact-based token economics, Ctrl+C handling, Repo Map caching strategy, first-run wizard edge cases, commit strategy, undo delegation. See [Round 5-7 grill notes](#12-grill-session-notes).
+**Changelog from v2.1:** Added full Context Compaction Strategy (section 6.5) — LLM summarization, adaptive truncation, manual `/smol` command, `/tokens` transparency, checkpoint/restore, disable option. Corrected attribution error (Aider does NOT summarize conversation, only Cline does). See [Round 8 grill notes](#round-8-v21--v22--compaction-strategy-gap).
 
 ---
 
@@ -445,17 +445,137 @@ Repo Map cached tại `.awecode/cache/repo-map.json`, keyed by git commit hash:
 
 | Pattern | Lấy từ |
 |---------|--------|
-| Repo Map via tree-sitter | Aider |
-| Explicit token tracking + UI panel | Cline |
+| Repo Map via tree-sitter + PageRank ranking | Aider |
+| Explicit token tracking + UI panel + Context Window bar | Cline |
 | File content auto-refresh mỗi turn | Plandex |
-| Auto-summarize khi gần full | Cline condense |
+| LLM-based summarization với adaptive truncation | Cline |
 | Partial-file (lines range) | USP riêng |
 
-### 6.5 Auto-management rules
+⚠️ **Correction:** Spec v2.1 ghi "Auto-summarize khi gần full (không drop) — Cline condense" nhưng ghi sai cho Aider — Aider KHÔNG summarize conversation, chỉ drop old messages. Summarize là pattern của Cline. Awecode theo Cline pattern (LLM summarization), không theo Aider (drop).
+
+### 6.5 Context Compaction Strategy
+
+Đây là section quan trọng — quyết định awecode có chạy được task dài không. Tham khảo chính: **Cline** (LLM summarization + adaptive truncation + UI), **Aider** (`/tokens` command).
+
+#### 6.5.1 Auto-compact Trigger
+
+```yaml
+# .agentrc.yaml
+compaction:
+  autoCompact: true              # default true; disable để fallback rule-based truncation
+  moderateThreshold: 0.85        # 85% budget → summarize oldest 50%
+  severeThreshold: 0.95          # 95% budget → summarize oldest 75%
+```
+
+Khi `totalTokens / budget >= moderateThreshold` → trigger compaction.
+
+#### 6.5.2 LLM Summarization Prompt
+
+Awecode gọi LLM (model nhỏ, vd haiku) với prompt explicit:
+
+```
+Summarize the conversation so far. PRESERVE:
+1. Original user task statement
+2. Key design decisions made
+3. Files currently in context (paths + brief description)
+4. Errors encountered and resolutions
+5. Last 5 user-assistant turns (verbatim)
+
+DISCARD:
+- Verbose tool output (full file contents already in context entries)
+- Redundant code reads
+- Intermediate exploration that didn't lead to decisions
+
+Output format: Markdown with sections [Task], [Decisions], [Files], [Errors], [Recent Turns].
+```
+
+#### 6.5.3 Adaptive Truncation Strategy
+
+| Pressure Level | Action |
+|----------------|--------|
+| `totalTokens / budget >= 0.85` (moderate) | Summarize oldest 50% of conversation |
+| `totalTokens / budget >= 0.95` (severe) | Summarize oldest 75% of conversation, keep last 5 turns verbatim |
+| Disable auto-compact | Fallback: drop oldest messages (rule-based, không LLM call) |
+
+#### 6.5.4 Preserve Rules (luôn giữ qua compaction)
+
+- **Original task message** (user's first prompt trong Task)
+- **Currently edited files** content (đang trong Context Entry active)
+- **Last 5 user-assistant turns** (verbatim, không summarize)
+- **Workflow artifacts references** (paths đến spec.md, plan.md đã tạo)
+- **Repo Map** (đã compressed rồi, không compact tiếp)
+
+#### 6.5.5 Manual Command — `/smol`
+
+Tránh từ `/compact` vì Cline issue #7222 cảnh báo model có thể hiểu lầm thành "make UI compact".
+
+| Command | Action |
+|---------|--------|
+| `/smol` | Trigger LLM summarization ngay lập tức (alias: `/condense`) |
+| `/tokens` | Show token usage breakdown: per-entry, per-message, budget remaining |
+| `/checkpoint` | Save snapshot hiện tại vào `.awecode/history/checkpoint-<ts>.json` |
+| `/restore <checkpoint-id>` | Restore từ checkpoint |
+
+#### 6.5.6 UI Indicator
+
+```
+┌─ Context (87,341 / 100,000 tokens) ── 87% ── MODERATE ──┐
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░                       │
+├──────────────────────────────────────────────────────────┤
+│ [user]   src/utils/parser.ts       (full)    234 tok    │
+│ ...                                                      │
+│ [auto-compact at 85% — `/smol` to trigger manually]     │
+├──────────────────────────────────────────────────────────┤
+│ [x] remove  [e] expand  [s] /smol  [t] /tokens          │
+└──────────────────────────────────────────────────────────┘
+```
+
+Khi đang compact, TUI hiện:
+
+```
+⚡ Compacting context... (summarizing 47 messages → ~12 messages)
+```
+
+#### 6.5.7 Checkpoint trước compact
+
+Trước mỗi compaction (auto hoặc manual), awecode auto-save snapshot:
+
+```json
+// .awecode/history/checkpoint-<timestamp>.json
+{
+  "timestamp": "2026-06-19T17:00:00Z",
+  "trigger": "auto-compact | manual /smol",
+  "preCompactTokens": 87341,
+  "contextEntries": [...],
+  "conversationHistory": [...]
+}
+```
+
+User có thể restore nếu compact lose info quan trọng:
+
+```bash
+awecode restore <checkpoint-id>
+# hoặc slash command
+/restore 2026-06-19-1700
+```
+
+#### 6.5.8 Repo Map độc lập
+
+Repo Map (đã compressed bởi tree-sitter + PageRank) **không bị compact tiếp**. Nó đã ở dạng tối giản. Chỉ conversation history mới compact.
+
+#### 6.5.9 References
+
+- **Cline** ContextManager class: `.clinerules/cline-overview.md` trên GitHub
+- **Cline** issue #5790 (auto-compact lose context), #7222 (`/compact` misunderstanding)
+- **Aider** `/tokens` command + `--map-tokens` config: aider.chat/docs/repomap
+- **Claude Code** conversation compaction pattern (closed source,参考 only)
+
+### 6.6 Auto-management rules
 
 | Trigger | Action |
 |---------|--------|
-| `totalTokens > 0.85 * budget` | Hỏi user: summarize hoặc remove |
+| `totalTokens / budget >= 0.85` | Auto-compact moderate (summarize oldest 50%) — xem [6.5 Compaction Strategy](#65-context-compaction-strategy) |
+| `totalTokens / budget >= 0.95` | Auto-compact severe (summarize oldest 75%, keep last 5 turns verbatim) |
 | File modify qua diff | Tự `refreshFile` |
 | Agent gọi `read_file` | Tự thêm vào context |
 | Diff apply fail 3 lần | Auto re-add file full content |
@@ -897,7 +1017,19 @@ Spec v1 → v2 qua 4 round grilling (Q1-Q20) + spec v2 qua 3 round thêm (Q21-Q3
 | Q34 | Commit strategy: user chọn (per-block/per-task/manual), default per-task |
 | Q35 | Undo: delegate `git revert`, không native |
 
-ADRs tạo: [0001](../../adr/0001-vercel-ai-sdk-for-llm-abstraction.md), [0002](../../adr/0002-workflow-engine-auto-trigger-by-intent.md), [0003](../../adr/0003-anchor-based-diff-insert-positioning.md), [0004](../../adr/0004-apache-2.0-license.md), [0005](../../adr/0005-consolidated-awecode-directory-layout.md).
+### Round 8 (v2.1 → v2.2) — Compaction Strategy gap
+
+| # | Quyết định |
+|---|------------|
+| Q36 | Compaction = LLM summarization, không phải drop (Cline pattern) |
+| Q37 | Adaptive truncation: 85% moderate (50%), 95% severe (75%) |
+| Q38 | Manual command `/smol` (alias `/condense`) — tránh `/compact` (Cline #7222 bug) |
+| Q39 | `/tokens` command cho transparency (Aider pattern) |
+| Q40 | Checkpoint trước compact, lưu `.awecode/history/`, restore được |
+| Q41 | Repo Map exempt khỏi Compaction |
+| Q42 | Disable option `autoCompact: false` → fallback rule-based |
+
+ADRs tạo: [0001](../../adr/0001-vercel-ai-sdk-for-llm-abstraction.md), [0002](../../adr/0002-workflow-engine-auto-trigger-by-intent.md), [0003](../../adr/0003-anchor-based-diff-insert-positioning.md), [0004](../../adr/0004-apache-2.0-license.md), [0005](../../adr/0005-consolidated-awecode-directory-layout.md), [0006](../../adr/0006-llm-based-context-compaction.md).
 
 ---
 
