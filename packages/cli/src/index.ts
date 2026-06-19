@@ -46,6 +46,12 @@ Config: ~/.config/awecode/config.yaml
     return;
   }
 
+  if (args[0] === 'chat-test') {
+    const { chatTestCommand } = await import('./commands/chat-test.js');
+    await chatTestCommand();
+    return;
+  }
+
   console.error(`Unknown command: ${args[0]}. Run 'awecode --help' for usage.`);
   process.exit(1);
 }
