@@ -24,4 +24,6 @@ export type {
   ModelRef,
 } from './types.js';
 
+export { loadConfig, saveConfig, getDefaultConfigPath } from './config.js';
+
 export const LLM_PACKAGE_VERSION = '0.0.0';
