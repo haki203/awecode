@@ -25,5 +25,6 @@ export type {
 } from './types.js';
 
 export { loadConfig, saveConfig, getDefaultConfigPath } from './config.js';
+export { createProvider } from './providers.js';
 
 export const LLM_PACKAGE_VERSION = '0.0.0';
