@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const args = process.argv.slice(2);
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
 
-if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
-  console.log(`awecode - CLI Coding Agent with workflow engine
+  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+    console.log(`awecode - CLI Coding Agent with workflow engine
 
 USAGE:
   awecode <command> [options]
@@ -31,13 +32,25 @@ ENVIRONMENT:
 
 Config: ~/.config/awecode/config.yaml
 `);
-  process.exit(0);
+    return;
+  }
+
+  if (args[0] === '--version' || args[0] === '-v') {
+    console.log('awecode 0.0.0');
+    return;
+  }
+
+  if (args[0] === 'config') {
+    const { configCommand } = await import('./commands/config.js');
+    await configCommand();
+    return;
+  }
+
+  console.error(`Unknown command: ${args[0]}. Run 'awecode --help' for usage.`);
+  process.exit(1);
 }
 
-if (args[0] === '--version' || args[0] === '-v') {
-  console.log('awecode 0.0.0');
-  process.exit(0);
-}
-
-console.error(`Unknown command: ${args[0]}. Run 'awecode --help' for usage.`);
-process.exit(1);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
