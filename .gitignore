@@ -8,8 +8,9 @@ dist/
 build/
 *.tsbuildinfo
 
-# Agent workspace
-.agent-ws/
+# Awecode
+.awecode/worktrees/
+.awecode/cache/
 
 # Logs
 *.log

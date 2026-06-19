@@ -9,7 +9,7 @@ A user-stated goal that runs from the initial prompt until the agent declares it
 _Avoid_: request, prompt, message (these are single-turn; Task is the whole goal)
 
 **Workflow**:
-A named sequence of phases the agent runs to produce a design artifact before implementation. Built-in workflows: `brainstorm` → `spec` → `grill` → `plan`. Triggered automatically for creative/build Tasks; skipped for simple edit/fix/query Tasks.
+A named sequence of phases the agent runs to produce a design artifact before implementation. Built-in workflows: `brainstorm` → `spec` → `grill` → `plan`. Triggered automatically for creative/build Tasks via Intent Declaration; skipped for simple Tasks (which run in Direct Mode). Phases can be skipped or invoked individually via slash commands.
 _Avoid_: pipeline (too infrastructure-flavored), process
 
 **Skill**:
@@ -17,8 +17,12 @@ A SKILL.md document that teaches the agent how to execute a Workflow phase. Skil
 _Avoid_: plugin (reserved for v0.2+ external extensions), module (overloaded with package modules)
 
 **Worktree**:
-A git worktree under `.agent-ws/<uuid>/` where the agent applies diffs and runs commands in isolation from the user's working directory. Lifecycle bounded by the Task; garbage-collected after 24h of session exit.
+A git worktree under `.awecode/worktrees/<uuid>/` where the agent applies diffs and runs commands in isolation from the user's working directory. Lifecycle bounded by the Task; garbage-collected after 24h of session exit.
 _Avoid_: shadow directory (we don't use copy/symlink — only native git worktree), sandbox (sandbox is the security layer; worktree is the isolation unit)
+
+**Direct Mode**:
+The agent state when no Workflow is active. The agent receives a prompt and responds directly (chat-style) without going through brainstorm→spec→grill→plan phases. Used for simple Tasks (typo fix, single-file edit, factual query).
+_Avoid_: chat mode (too generic), inline mode (suggests inline edit), normal mode (meaningless)
 
 **Diff Block**:
 A pair `(search, replace)` with optional anchor metadata. The atomic unit of file change produced by the agent and reviewed per-block in Approval Mode.
@@ -46,8 +50,9 @@ _Avoid_: classifier, router
 
 ## Relationships
 
+- A **Task** runs in exactly one mode at a time: **Direct Mode** or a **Workflow**
 - A **Task** owns one or more **Worktrees** and a stream of **Context Entries**
-- A **Task** triggers zero or one **Workflow** via an **Intent Declaration**
+- A **Task** transitions from Direct Mode into a **Workflow** via an **Intent Declaration**
 - A **Workflow** is composed of **Skills** invoked via `invoke_skill()`
 - Each **Diff Block** targets one file and is reviewed in **Approval Mode**
 - A **Self-heal Loop** runs inside a **Worktree** and produces **Diff Blocks**
@@ -72,3 +77,5 @@ _Avoid_: classifier, router
 - "session" was used to mean both an interactive TUI session and a persistent Task — resolved: **Session** = interactive TUI process; **Task** = the user's goal (may span multiple Sessions via resumable state in `.awecode/session.json`).
 - "diff" was overloaded — resolved: **Diff Block** = atomic search/replace pair; **Diff** = the rendered visual output in Approval Mode (composed of one or more Diff Blocks).
 - "shadow workspace" in early brainstorming — resolved: rejected in favor of **Worktree** (native git worktree, not copy-based shadow directory).
+- "chat mode" / "normal mode" used informally for the no-workflow state — resolved: canonical term is **Direct Mode**.
+- "plugin" vs "skill" overlap — resolved: **Skill** ships in v0.1 (SKILL.md prompt + tool composition); **Plugin** (native code package) deferred to v0.2+.

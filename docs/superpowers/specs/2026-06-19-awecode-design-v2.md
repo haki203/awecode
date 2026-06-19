@@ -4,7 +4,7 @@
 **Trạng thái:** Approved (post-grill — see [Grill Session Notes](#11-grill-session-notes))
 **Scope:** v0.1 — MVP with Workflow Engine + Harness + Self-heal
 
-> **Changelog from v1:** Refactored terminology (see [CONTEXT.md](../../../CONTEXT.md)), added Workflow Engine (the core USP), added Skill system, anchor-based diff positioning, Vercel AI SDK, test strategy, first-run wizard, 14-16 week timeline. v1 archived at `docs/superpowers/specs/archive/2026-06-19-awecode-design-v1-pre-grill.md`.
+**Changelog from v2:** Added Direct Mode terminology, `.awecode/` consolidated directory layout, Workflow phases artifact-based token economics, Ctrl+C handling, Repo Map caching strategy, first-run wizard edge cases, commit strategy, undo delegation. See [Round 5-7 grill notes](#12-grill-session-notes).
 
 ---
 
@@ -220,9 +220,9 @@ Cross-platform (Windows/Linux/Mac), dùng **native git worktree**.
    ↓
 2. harness.createWorktree()
    - Generate random UUID
-   - git worktree add .agent-ws/<uuid> -b agent/<uuid>
-   - .agent-ws/ auto-added to .gitignore
-   - Returns path: <projectRoot>/.agent-ws/<uuid>
+   - git worktree add .awecode/worktrees/<uuid> -b agent/<uuid>
+   - .awecode/worktrees/ auto-added to .gitignore
+   - Returns path: <projectRoot>/.awecode/worktrees/<uuid>
    ↓
 3. Agent apply Diff Blocks vào worktree (KHÔNG vào working dir)
    ↓
@@ -244,6 +244,32 @@ Cross-platform (Windows/Linux/Mac), dùng **native git worktree**.
 ```
 
 **Worktree GC:** Trên CLI exit, worktree giữ lại 24h (config) cho resume. Sau đó garbage-collected. `awecode worktree clean` để dọn thủ công.
+
+### 5.2 Project Directory Layout
+
+Tất cả awecode state trong project ở 1 directory `.awecode/` (xem Q31 grill):
+
+```
+<project-root>/
+├── .awecode/
+│   ├── session.json              # Task + Workflow state (commit-able)
+│   ├── worktrees/                # Git worktrees (gitignored)
+│   │   └── <uuid>/
+│   ├── cache/                    # Cached artifacts (gitignored)
+│   │   └── repo-map.json         # Repo Map cache keyed by commit hash
+│   ├── skills/                   # Project-specific skills (commit-able)
+│   └── history/                  # Task history (commit-able, optional)
+└── ...
+```
+
+**Gitignore template:**
+
+```
+.awecode/worktrees/
+.awecode/cache/
+```
+
+Phần còn lại (session.json, skills/, history/) commit-able cho team share.
 
 ### 5.2 Cross-platform Shell Execution
 
@@ -330,6 +356,31 @@ awecode worktree clean --stale   # cleanup worktrees > 24h old
 /worktree clean <uuid>
 ```
 
+### 5.7 Commit Strategy (Q34 grill)
+
+Sau khi Diff Block approved và apply vào working dir, git commit theo strategy user chọn:
+
+```yaml
+# .agentrc.yaml
+commit:
+  strategy: per-task    # | per-block | manual
+  messageConvention: "awecode: <task-uuid> block <n>/<total>"
+```
+
+| Strategy | Behavior |
+|----------|----------|
+| `per-task` (default) | 1 commit cho tất cả Diff Blocks trong 1 Task |
+| `per-block` | 1 commit per Diff Block approved (atomic revert) |
+| `manual` | Không auto-commit, user tự commit |
+
+### 5.8 Undo / Rollback (Q35 grill)
+
+**Awecode không có native undo** — git là source of truth cho history.
+
+- User approve nhầm → `git revert HEAD` (hoặc specific commit)
+- Worktree bị hỏng → `git checkout .` trong worktree
+- Awecode commit messages có convention `awecode: <task-uuid>` → dễ filter via `git log --grep "awecode:"`
+
 ---
 
 ## 6. Context Manager (`packages/agent/context.ts`)
@@ -370,7 +421,25 @@ interface Context {
 
 ### 6.3 Token Estimation
 
-Dùng `gpt-tokenizer` (JS pure, xấp xỉ tốt cho OpenAI/Anthropic).
+Dùng **`gpt-tokenizer`** standalone (xem Q33 grill — không phụ thuộc Vercel AI SDK `countTokens()` để tránh coupling, vì SDK có thể thay đổi method signature). Xấp xỉ tốt cho OpenAI/Anthropic.
+
+### 6.4 Repo Map Caching (Q24 grill)
+
+Repo Map cached tại `.awecode/cache/repo-map.json`, keyed by git commit hash:
+
+```json
+{
+  "commitHash": "abc123...",
+  "generatedAt": "2026-06-19T16:00:00Z",
+  "entries": [
+    { "path": "src/utils/parser.ts", "symbols": [...] }
+  ]
+}
+```
+
+- Khi Task mới: check `git rev-parse HEAD` → so với cache → match thì reuse
+- Khi HEAD di chuyển (commit mới, branch switch): regenerate
+- Repo > 10k files: regen mất 5-15s → progress indicator trong TUI
 
 ### 6.4 Pattern picked từ OSS research
 
@@ -393,9 +462,11 @@ Dùng `gpt-tokenizer` (JS pure, xấp xỉ tốt cho OpenAI/Anthropic).
 
 ### 6.6 Repo Map (v0.1)
 
-**Ship v0.1 với 5 ngôn ngữ:** TypeScript, JavaScript, Python, Go, Rust (xem Q19 grill — user chọn full coverage, timeline kéo 14-16 tuần).
+**Ship v0.1 với 5 ngôn ngữ:** TypeScript, JavaScript, Python, Go, Rust (xem Q19 grill).
 
 Tree-sitter parsers: `web-tree-sitter` + grammar packages.
+
+**File ngoài 5 ngôn ngữ** (Q30 grill): Xuất hiện trong Repo Map với `type: "unknown"`, list-only (path + size + line count). Không parse symbols. Agent thấy tồn tại → có thể `read_file` nếu cần content.
 
 ### 6.7 Context Transparency TUI
 
@@ -423,17 +494,19 @@ Tree-sitter parsers: `web-tree-sitter` + grammar packages.
 
 Khi user gửi prompt, agent **tự quyết định** có chạy Workflow hay không bằng cách emit `start_workflow(name)` tool call ở đầu response (xem [ADR-0002](../../adr/0002-workflow-engine-auto-trigger-by-intent.md)):
 
-| Loại task | Agent behavior |
-|-----------|----------------|
-| "Fix typo 'recieve' → 'receive' trong X" | Không emit workflow → chat loop như Aider |
-| "Add unit test for `parseDiff`" | Có thể emit `start_workflow("spec")` nhẹ |
-| "Build CSV import feature with validation" | Emit `start_workflow("brainstorm")` → full pipeline |
-| "Refactor toàn bộ auth module sang OAuth" | Emit `start_workflow("brainstorm")` → full pipeline |
+| Loại task | Agent behavior | Mode |
+|-----------|----------------|------|
+| "Fix typo 'recieve' → 'receive' trong X" | Không emit workflow | **Direct Mode** |
+| "Add unit test for `parseDiff`" | Có thể emit `start_workflow("spec")` nhẹ | Workflow hoặc Direct |
+| "Build CSV import feature with validation" | Emit `start_workflow("brainstorm")` → full pipeline | Workflow Mode |
+| "Refactor toàn bộ auth module sang OAuth" | Emit `start_workflow("brainstorm")` → full pipeline | Workflow Mode |
 
 User có thể override:
 
-- `/brainstorm`, `/spec`, `/grill`, `/plan` — slash command explicit
-- `/skip-workflow` — ép agent vào chat loop
+- `/brainstorm`, `/spec`, `/grill`, `/plan` — slash command explicit, có thể skip phase hoặc invoke riêng lẻ (Q26 grill)
+- `/skip-workflow` — ép agent vào Direct Mode
+
+**Workflow Engine crash handling (Q23 grill):** Nếu skill file malformed hoặc workflow engine bug → fail-loud (in error stack) → agent fallback sang Direct Mode → task tiếp tục.
 
 ### 7.2 Built-in Workflows
 
@@ -443,14 +516,24 @@ User có thể override:
 brainstorm → spec → grill → plan → [agent implementation]
 ```
 
-| Skill | Mục đích | Output |
-|-------|----------|--------|
-| `brainstorm` | Khám phá requirements, đề xuất approaches | Design decisions |
+| Skill | Mục đích | Output artifact |
+|-------|----------|----------------|
+| `brainstorm` | Khám phá requirements, đề xuất approaches | Design decisions (logged to `.awecode/history/`) |
 | `spec` | Viết design doc | `docs/specs/<topic>-design.md` |
 | `grill` | Stress-test spec bằng batched questions | Spec revisions + ADRs |
 | `plan` | Tạo implementation plan | `docs/plans/<topic>-plan.md` |
 
-### 7.3 Skill Format
+### 7.3 Artifact-Based Token Economics (Q25 grill)
+
+Workflow phases **không add Context Entry vào chat budget**. Mỗi phase:
+
+1. Là LLM call riêng (token riêng, không đụng chat)
+2. Output là file trên disk (artifact)
+3. Context chỉ giữ reference + summary (vd `[spec written to docs/specs/auth-design.md, 450 lines]`)
+
+Agent implement phase đọc file artifact cần thiết qua `read_file`. Tránh context budget bị blow up sau 4 phases.
+
+### 7.4 Skill Format
 
 **SKILL.md thuần** — compatible với superpowers/grill-with-docs-v2 (xem Q7 grill):
 
@@ -466,7 +549,7 @@ trigger: creative-task
 Read project context first. Ask one question at a time...
 ```
 
-### 7.4 Skill Layout & Precedence
+### 7.5 Skill Layout & Precedence
 
 (xem Q8 grill)
 
@@ -478,7 +561,7 @@ Read project context first. Ask one question at a time...
 
 **Precedence:** project > user > built-in. User có thể override built-in bằng cách đặt skill cùng tên ở mức cao hơn.
 
-### 7.5 Skill Composition
+### 7.6 Skill Composition
 
 Skill có thể gọi skill khác qua tool `invoke_skill(name)` (xem Q9 grill):
 
@@ -487,7 +570,7 @@ Skill có thể gọi skill khác qua tool `invoke_skill(name)` (xem Q9 grill):
 await invoke_skill('grill-with-docs-v2', { spec: '...' });
 ```
 
-### 7.6 Session State
+### 7.7 Session State & Ctrl+C Handling
 
 Lưu ở `.awecode/session.json` trong project root (xem Q10 grill):
 
@@ -497,14 +580,34 @@ Lưu ở `.awecode/session.json` trong project root (xem Q10 grill):
   "currentWorkflow": "grill",
   "currentPhase": "round-3",
   "history": [
-    { "workflow": "brainstorm", "completedAt": "...", "output": "..." },
-    { "workflow": "spec", "completedAt": "...", "output": "..." }
+    { "workflow": "brainstorm", "completedAt": "...", "output": "..." }
   ],
   "pendingQuestions": [...]
 }
 ```
 
 Resumable across TUI sessions. Commit-able cho team collaboration.
+
+**Ctrl+C handling (Q22 grill):**
+
+- 1st Ctrl+C trong Workflow phase → pause phase, lưu state vào session.json, exit
+- 2nd Ctrl+C trong 3s → discard workflow hoàn toàn
+- `awecode resume` → continue phase từ state
+
+### 7.8 Input Rejection During Workflow (Q27 grill)
+
+Khi agent đang trong Workflow phase hoặc đang stream response, user gõ prompt mới:
+
+- TUI hiện warning: `⚠ Agent đang bận (workflow: brainstorm, round 2/5). Ctrl+C để abort hoặc đợi.`
+- Prompt bị **reject**, user phải gõ lại sau
+- Pattern convention của Aider/Cline/Cursor
+
+### 7.9 Skill ≠ Plugin (Q28 grill)
+
+| Concept | Version | Description |
+|---------|---------|-------------|
+| **Skill** | v0.1 | SKILL.md prompt + tool composition. No native code execution. |
+| **Plugin** | v0.2+ | Native code package (TS/JS) cho tool mới. Install qua `awecode install <pkg>`. |
 
 ---
 
@@ -625,7 +728,7 @@ import { ollama } from 'ollama-ai-provider';
 
 ### 9.3 First-run Wizard
 
-Lần đầu chạy `awecode`, nếu chưa có config:
+Lần đầu chạy `awecode`, nếu chưa có config (xem Q32 grill — 3 outcomes):
 
 ```
 $ awecode
@@ -635,13 +738,21 @@ Welcome to awecode! Let's set up your LLM provider.
   ❯ OpenAI (GPT models)
     Anthropic (Claude models)
     Google (Gemini models)
-    Ollama (local models)
+    Ollama (local models — no API key needed)
     OpenAI-compatible (OpenRouter, Together, etc.)
 
+# Nếu chọn provider cần key nhưng user chưa có:
 ? API key: ********
 ? Default model [gpt-4o-mini]: 
 
 ✓ Config saved to ~/.config/awecode/config.yaml
+
+# Nếu user chọn "Skip" (no key, no Ollama):
+⚠ No provider configured. 
+  Get API key: https://docs.anthropic.com / https://platform.openai.com/api-keys
+  Or install Ollama: https://ollama.com
+  Then re-run `awecode` to configure.
+Exiting.
 ```
 
 ### 9.4 Config Precedence
@@ -739,7 +850,9 @@ Welcome to awecode! Let's set up your LLM provider.
 
 ## 12. Grill Session Notes
 
-Spec v1 được review qua 4 round grilling (20 questions) dùng skill `grill-with-docs-v2`. Tổng hợp quyết định:
+Spec v1 → v2 qua 4 round grilling (Q1-Q20) + spec v2 qua 3 round thêm (Q21-Q35) dùng skill `grill-with-docs-v2`. Tổng hợp quyết định:
+
+### Round 1-4 (v1 → v2)
 
 | # | Quyết định |
 |---|------------|
@@ -764,7 +877,27 @@ Spec v1 được review qua 4 round grilling (20 questions) dùng skill `grill-w
 | Q19 | Repo map: ship v0.1 full (5 ngôn ngữ) |
 | Q20 | LLM: Vercel AI SDK + OpenAI-compat + first-run wizard + native modules |
 
-ADRs tạo: [0001](../../adr/0001-vercel-ai-sdk-for-llm-abstraction.md), [0002](../../adr/0002-workflow-engine-auto-trigger-by-intent.md), [0003](../../adr/0003-anchor-based-diff-insert-positioning.md), [0004](../../adr/0004-apache-2.0-license.md).
+### Round 5-7 (v2 → v2.1)
+
+| # | Quyết định |
+|---|------------|
+| Q21 | "Direct Mode" = state khi không có Workflow |
+| Q22 | Ctrl+C: 1st pause, 2nd discard (3s window) |
+| Q23 | Workflow Engine crash: fail-loud, fallback Direct Mode |
+| Q24 | Repo Map cache: keyed by git commit hash |
+| Q25 | Workflow phases: artifact-based, chỉ reference trong Context |
+| Q26 | Skip phases: yes, any phase qua slash command |
+| Q27 | User input khi workflow chạy: reject + warning |
+| Q28 | Skill (v0.1) ≠ Plugin (v0.2+) |
+| Q29 | Diff fail retry: structured error + suggestions |
+| Q30 | File ngoài 5 ngôn ngữ Repo Map: list-only type "unknown" |
+| Q31 | Directory layout: `.awecode/` consolidated (worktrees, session, cache, skills) |
+| Q32 | First-run wizard: 3 outcomes (key / Ollama / skip+exit) |
+| Q33 | Token counter: `gpt-tokenizer` standalone (không phụ thuộc Vercel SDK) |
+| Q34 | Commit strategy: user chọn (per-block/per-task/manual), default per-task |
+| Q35 | Undo: delegate `git revert`, không native |
+
+ADRs tạo: [0001](../../adr/0001-vercel-ai-sdk-for-llm-abstraction.md), [0002](../../adr/0002-workflow-engine-auto-trigger-by-intent.md), [0003](../../adr/0003-anchor-based-diff-insert-positioning.md), [0004](../../adr/0004-apache-2.0-license.md), [0005](../../adr/0005-consolidated-awecode-directory-layout.md).
 
 ---
 
