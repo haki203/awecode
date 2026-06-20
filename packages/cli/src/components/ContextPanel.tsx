@@ -14,6 +14,7 @@
 
 import { Box, Text } from 'ink';
 import type { ContextEntry } from '@awecode/agent';
+import { TokenBar } from './TokenBar.js';
 
 interface Props {
   entries: readonly ContextEntry[];
@@ -22,28 +23,30 @@ interface Props {
 }
 
 export function ContextPanel({ entries, totalTokens, budget }: Props) {
-  // Clamp to [0, 100] so a runaway totalTokens (> budget) can never overflow the
-  // 20-cell progress bar (`'░'.repeat(20 - ...)` would otherwise receive a
-  // negative arg and throw RangeError). See Task 15 review notes.
-  const rawPct = budget > 0 ? Math.round((totalTokens / budget) * 100) : 0;
-  const pct = Math.max(0, Math.min(100, rawPct));
-  const color = pct >= 95 ? 'red' : pct >= 85 ? 'yellow' : 'green';
+  const pct = budget > 0 ? Math.round((totalTokens / budget) * 100) : 0;
+  const showCompactionHint = pct >= 85;
 
   return (
     <Box flexDirection="column">
-      <Text bold>
-        Context ({totalTokens.toLocaleString()} / {budget.toLocaleString()})
-      </Text>
-      <Text color={color}>
-        {'█'.repeat(Math.floor(pct / 5))}
-        {'░'.repeat(20 - Math.floor(pct / 5))}
-      </Text>
-      <Text> </Text>
-      {entries.map((e) => (
-        <Text key={e.id}>
-          [{e.addedBy}] {e.path ?? `[${e.type}]`} ({e.tokens} tok)
+      <TokenBar used={totalTokens} budget={budget} />
+
+      {showCompactionHint && (
+        <Text color="yellow" dimColor>
+          [auto-compact at {pct}% — /smol to trigger manually]
         </Text>
-      ))}
+      )}
+
+      <Text> </Text>
+
+      {entries.length === 0 ? (
+        <Text dimColor>(no context entries)</Text>
+      ) : (
+        entries.map((e) => (
+          <Text key={e.id}>
+            [{e.addedBy}] {e.path ?? `[${e.type}]`} ({e.tokens} tok)
+          </Text>
+        ))
+      )}
     </Box>
   );
 }
