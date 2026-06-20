@@ -21,14 +21,81 @@ export type {
 
 export { readFileTool, readFileDef } from './file/read.js';
 export type { ReadFileArgs } from './file/read.js';
-
 export { listFilesTool, listFilesDef } from './file/list.js';
 export type { ListFilesArgs } from './file/list.js';
-
 export { searchFilesTool, searchFilesDef } from './file/search.js';
 export type { SearchFilesArgs } from './file/search.js';
-
 export { shellExecTool, shellExecDef } from './shell/exec.js';
 export type { ShellExecArgs } from './shell/exec.js';
+
+import type { ToolDefinition, ToolCall, ToolResult } from './types.js';
+import { readFileTool, readFileDef } from './file/read.js';
+import type { ReadFileArgs } from './file/read.js';
+import { listFilesTool, listFilesDef } from './file/list.js';
+import type { ListFilesArgs } from './file/list.js';
+import { searchFilesTool, searchFilesDef } from './file/search.js';
+import type { SearchFilesArgs } from './file/search.js';
+import { shellExecTool, shellExecDef } from './shell/exec.js';
+import type { ShellExecArgs } from './shell/exec.js';
+
+/**
+ * Generic shape every tool handler satisfies at the dispatcher boundary.
+ * Tools own a stricter, specific args type internally; the dispatcher hands
+ * them an unvalidated record (matching `ToolCall.arguments`). Validation of
+ * individual fields is the tool's responsibility.
+ */
+type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
+
+/**
+ * Type-safe adapter that lifts a tool with a specific args type into the
+ * generic `ToolHandler` shape. The cast is confined to this single helper:
+ * callers pass concrete `(args: FooArgs) => Promise<ToolResult>` functions
+ * and get a `ToolHandler` back, so the registry never sees `any`. The input
+ * record is passed straight through — tools read only the fields they
+ * declare and ignore the rest — so no runtime coercion is needed.
+ *
+ * `A` is constrained to `object` rather than `Record<string, unknown>`
+ * because the tool arg interfaces (e.g. `ReadFileArgs`) don't declare an
+ * index signature; `object` accepts them while still forbidding primitives.
+ */
+function adaptToolHandler<A extends object>(
+  handler: (args: A) => Promise<ToolResult>,
+): ToolHandler {
+  return (args: Record<string, unknown>) => handler(args as A);
+}
+
+export const TOOL_REGISTRY: Record<
+  string,
+  { def: ToolDefinition; handler: ToolHandler }
+> = {
+  [readFileDef.name]: {
+    def: readFileDef,
+    handler: adaptToolHandler<ReadFileArgs>(readFileTool),
+  },
+  [listFilesDef.name]: {
+    def: listFilesDef,
+    handler: adaptToolHandler<ListFilesArgs>(listFilesTool),
+  },
+  [searchFilesDef.name]: {
+    def: searchFilesDef,
+    handler: adaptToolHandler<SearchFilesArgs>(searchFilesTool),
+  },
+  [shellExecDef.name]: {
+    def: shellExecDef,
+    handler: adaptToolHandler<ShellExecArgs>(shellExecTool),
+  },
+};
+
+export function listToolDefinitions(): ToolDefinition[] {
+  return Object.values(TOOL_REGISTRY).map((t) => t.def);
+}
+
+export async function dispatchTool(call: ToolCall): Promise<ToolResult> {
+  const entry = TOOL_REGISTRY[call.name];
+  if (!entry) {
+    return { ok: false, error: `Unknown tool: ${call.name}` };
+  }
+  return entry.handler(call.arguments);
+}
 
 export const TOOLS_PACKAGE_VERSION = '0.0.0';

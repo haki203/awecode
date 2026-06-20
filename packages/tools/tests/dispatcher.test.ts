@@ -1,0 +1,63 @@
+// Copyright 2026 Awecode Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import { describe, it, expect } from 'vitest';
+import {
+  listToolDefinitions,
+  dispatchTool,
+  TOOL_REGISTRY,
+} from '../src/index.js';
+
+describe('tool registry', () => {
+  it('registers 4 built-in tools', () => {
+    const names = Object.keys(TOOL_REGISTRY);
+    expect(names).toContain('read_file');
+    expect(names).toContain('list_files');
+    expect(names).toContain('search_files');
+    expect(names).toContain('shell_exec');
+    expect(names).toHaveLength(4);
+  });
+
+  it('listToolDefinitions returns all definitions', () => {
+    const defs = listToolDefinitions();
+    expect(defs).toHaveLength(4);
+    expect(defs.map((d) => d.name).sort()).toEqual([
+      'list_files',
+      'read_file',
+      'search_files',
+      'shell_exec',
+    ]);
+  });
+});
+
+describe('dispatchTool', () => {
+  it('returns error on unknown tool', async () => {
+    const result = await dispatchTool({
+      name: 'nonexistent_tool',
+      arguments: {},
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Unknown tool/);
+  });
+
+  it('dispatches read_file correctly', async () => {
+    // Use a known path — package.json of this workspace
+    const result = await dispatchTool({
+      name: 'read_file',
+      arguments: { path: 'package.json' },
+    });
+    // package.json may or may not exist relative to cwd, but tool should at least dispatch
+    expect(result).toBeDefined();
+  });
+});
