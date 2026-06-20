@@ -138,6 +138,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@awecode/tools@workspace:packages/tools":
+  version: 0.0.0-use.local
+  resolution: "@awecode/tools@workspace:packages/tools"
+  dependencies:
+    "@types/node": "npm:^26.0.0"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^6.0.3"
+    vitest: "npm:^4.1.9"
+  languageName: unknown
+  linkType: soft
+
 "@emnapi/core@npm:1.10.0":
   version: 1.10.0
   resolution: "@emnapi/core@npm:1.10.0"
