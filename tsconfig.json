@@ -2,7 +2,8 @@
   "extends": "./tsconfig.base.json",
   "references": [
     { "path": "packages/llm" },
-    { "path": "packages/cli" }
+    { "path": "packages/cli" },
+    { "path": "packages/diff" }
   ],
   "files": []
 }
