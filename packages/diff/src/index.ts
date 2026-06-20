@@ -22,3 +22,5 @@ export type {
 } from './types.js';
 
 export const DIFF_PACKAGE_VERSION = '0.0.0';
+
+export { parseDiff } from './parse.js';
