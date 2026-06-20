@@ -17,8 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "diff-match-patch": "^1.0.5",
-    "zod": "^4.4.3"
+    "diff-match-patch": "^1.0.5"
   },
   "devDependencies": {
     "@types/diff-match-patch": "^1.0.36",

@@ -17,6 +17,7 @@ new code
 const parsed = parseDiff(llmOutput);
 // [{ filePath: 'src/foo.ts', blocks: [{ search: 'old code\n', replace: 'new code\n' }] }]
 
+const sourceCode = '<existing file contents>';
 const result = applyDiff(sourceCode, parsed[0].blocks);
 if (result.ok) {
   console.log(result.result);
