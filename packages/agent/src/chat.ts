@@ -17,6 +17,8 @@ import { createProvider } from '@awecode/llm';
 import type { AwecodeConfig } from '@awecode/llm';
 import { listToolDefinitions, dispatchTool } from '@awecode/tools';
 import type { ContextManager } from './context/manager.js';
+import { detectIntentFromText } from './intent.js';
+import type { IntentDeclaration } from './intent.js';
 
 export interface ChatLoopOptions {
   config: AwecodeConfig;
@@ -28,6 +30,7 @@ export interface ChatLoopOptions {
   onToolCall?: (name: string, args: unknown) => void;
   onToolResult?: (name: string, result: unknown) => void;
   onDiffDetected?: (diff: string) => void;
+  onIntentDeclared?: (intent: IntentDeclaration) => void;
 }
 
 export const DEFAULT_SYSTEM_PROMPT = `You are awecode, a CLI coding agent.
@@ -156,6 +159,9 @@ export async function runChatLoop(
     if (assistantText.includes('<<<< SEARCH')) {
       opts.onDiffDetected?.(assistantText);
     }
+
+    const intent = detectIntentFromText(assistantText);
+    opts.onIntentDeclared?.(intent);
 
     messages.push({ role: 'assistant', content: assistantText });
 
