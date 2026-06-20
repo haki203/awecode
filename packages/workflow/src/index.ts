@@ -25,6 +25,7 @@ export type {
 export { parseSkillMarkdown } from './parser.js';
 export { getBuiltInSkillsDir, listBuiltInSkillNames, BUILT_IN_SKILL_NAMES } from './builtin.js';
 export { loadSkill, listAvailableSkills } from './loader.js';
+export { startWorkflow, invokeSkill } from './engine.js';
 export { loadSession, saveSession, getSessionPath, createNewSession } from './state.js';
 
 export const WORKFLOW_PACKAGE_VERSION = '0.0.0';
