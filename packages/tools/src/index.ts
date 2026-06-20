@@ -19,4 +19,7 @@ export type {
   ContextEntryPayload,
 } from './types.js';
 
+export { readFileTool, readFileDef } from './file/read.js';
+export type { ReadFileArgs } from './file/read.js';
+
 export const TOOLS_PACKAGE_VERSION = '0.0.0';
