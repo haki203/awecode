@@ -23,6 +23,7 @@ export interface ChatLoopOptions {
   context: ContextManager;
   systemPrompt?: string;
   maxIterations?: number;
+  abortSignal?: AbortSignal;
   onToken?: (chunk: string) => void;
   onToolCall?: (name: string, args: unknown) => void;
   onToolResult?: (name: string, result: unknown) => void;
@@ -77,22 +78,29 @@ function buildToolSet(
 
 /**
  * Normalises a tool call coming back from `streamText` into the
- * `{ name, arguments }` shape `dispatchTool` expects.
+ * `{ name, arguments, id }` shape `dispatchTool` expects.
  *
  * AI SDK v6 types tool calls as `TypedToolCall` and carries the model-supplied
  * payload on an `input` field. The brief (and our test mock) use the older
  * `args` spelling, so we read whichever field is present. `toolName` is the
  * SDK's name for the tool identifier in both v5 and v6.
+ *
+ * `id` preserves the provider-assigned `toolCallId` (v6 `BaseToolCall`).
+ * Real providers (OpenAI, Anthropic) require the exact id they emitted for
+ * tool-result correlation; when absent (e.g. our mock test), callers fall
+ * back to a synthetic id built from the iteration index and tool name.
  */
 interface NormalizedToolCall {
   name: string;
   arguments: Record<string, unknown>;
+  id?: string;
 }
 
 function normalizeToolCall(call: {
   toolName: string;
   input?: unknown;
   args?: unknown;
+  toolCallId?: string;
 }): NormalizedToolCall {
   const raw = ('input' in call && call.input !== undefined)
     ? call.input
@@ -101,7 +109,7 @@ function normalizeToolCall(call: {
     raw !== null && typeof raw === 'object'
       ? (raw as Record<string, unknown>)
       : {};
-  return { name: call.toolName, arguments: args };
+  return { name: call.toolName, arguments: args, id: call.toolCallId };
 }
 
 export async function runChatLoop(
@@ -136,6 +144,7 @@ export async function runChatLoop(
       system: opts.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
       tools,
       maxOutputTokens: 4096,
+      abortSignal: opts.abortSignal,
     });
 
     let assistantText = '';
@@ -168,14 +177,16 @@ export async function runChatLoop(
       // `output` is a `ToolResultOutput` discriminated union; we serialise the
       // awecode `ToolResult` into a `text`-shaped output so the structured
       // success/error payload round-trips to the model as JSON-encoded text.
-      // A stable `toolCallId` lets a provider correlate the result with the
-      // originating call.
+      // Prefer the provider-assigned `toolCallId` (required by OpenAI /
+      // Anthropic for correlation); fall back to a synthetic id for the mock
+      // test which doesn't supply one.
+      const toolCallId = normalized.id ?? `call-${iter}-${normalized.name}`;
       messages.push({
         role: 'tool',
         content: [
           {
             type: 'tool-result',
-            toolCallId: `call-${iter}-${normalized.name}`,
+            toolCallId,
             toolName: normalized.name,
             output: { type: 'text', value: JSON.stringify(toolResult) },
           },

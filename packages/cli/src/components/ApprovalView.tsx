@@ -26,7 +26,6 @@ export function ApprovalView({ request, blockIndex, onDecision }: Props) {
   useInput((input, _key) => {
     if (input === 'y') onDecision('accept');
     else if (input === 'n') onDecision('reject');
-    else if (input === 'e') onDecision('edit');
     else if (input === 's') onDecision('skip');
   });
 
@@ -47,7 +46,6 @@ export function ApprovalView({ request, blockIndex, onDecision }: Props) {
       <Text>
         <Text color="green">[y]</Text> accept{'  '}
         <Text color="red">[n]</Text> reject{'  '}
-        <Text color="blue">[e]</Text> edit{'  '}
         <Text color="yellow">[s]</Text> skip
       </Text>
     </Box>

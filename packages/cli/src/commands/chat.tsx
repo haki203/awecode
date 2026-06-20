@@ -59,9 +59,14 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // Guards the initialPrompt auto-submit against React StrictMode's
   // double-invoke of effects in development.
   const initialSubmitRef = useRef(false);
+  // AbortController for the in-flight runChatLoop. Aborted on Ctrl+C before
+  // exit so streamText stops hitting the provider after the Ink app tears
+  // down. Cleared in handleSubmit's finally.
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar.toLowerCase() === 'c') {
+      abortControllerRef.current?.abort();
       exit();
     }
   });
@@ -89,10 +94,14 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
 
     setMessages((m) => [...m, { role: 'user', content: trimmed }]);
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       await runChatLoop([{ role: 'user', content: trimmed }], {
         config,
         context,
+        abortSignal: abortController.signal,
         onToken: (chunk) => {
           setMessages((m) => {
             const last = m[m.length - 1];
@@ -116,13 +125,21 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
         },
       });
     } catch (err) {
+      const isAbort =
+        err instanceof Error &&
+        (err.name === 'AbortError' ||
+          (err as { code?: string }).code === 'ABORT_ERR');
       setMessages((m) => [
         ...m,
-        { role: 'assistant', content: `[error] ${(err as Error).message}` },
+        {
+          role: 'assistant',
+          content: isAbort ? '[aborted]' : `[error] ${(err as Error).message}`,
+        },
       ]);
     } finally {
       streamingRef.current = false;
       setIsStreaming(false);
+      abortControllerRef.current = null;
       // After the stream completes, surface any pending diffs.
       pumpApproval();
     }

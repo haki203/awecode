@@ -43,15 +43,44 @@ describe('ApprovalQueue', () => {
     const q = new ApprovalQueue();
     q.enqueue(mockDiff);
     const snap = q.pending;
-    q.enqueue(mockDiff);
+    q.enqueue({ ...mockDiff, filePath: 'other.ts' });
     expect(snap).toHaveLength(1); // unchanged
     expect(q.pending).toHaveLength(2);
   });
 
   it('enqueued request has unique id', () => {
     const q = new ApprovalQueue();
+    const r1 = q.enqueue({ ...mockDiff, filePath: 'a.ts' });
+    const r2 = q.enqueue({ ...mockDiff, filePath: 'b.ts' });
+    expect(r1.id).not.toBe(r2.id);
+  });
+
+  it('dedups identical diffs (same content hash) enqueued twice', () => {
+    // A model that re-emits the same diff across iterations must not produce
+    // duplicate approval requests.
+    const q = new ApprovalQueue();
     const r1 = q.enqueue(mockDiff);
     const r2 = q.enqueue(mockDiff);
-    expect(r1.id).not.toBe(r2.id);
+    expect(r2.id).toBe(r1.id);
+    expect(q.pending).toHaveLength(1);
+  });
+
+  it('dedup persists after dequeue (reviewed diff cannot re-enter)', () => {
+    const q = new ApprovalQueue();
+    q.enqueue(mockDiff);
+    q.dequeue();
+    q.enqueue(mockDiff);
+    expect(q.pending).toHaveLength(0);
+  });
+
+  it('dedup honours filePath and block content (distinct diffs not merged)', () => {
+    const q = new ApprovalQueue();
+    q.enqueue(mockDiff);
+    q.enqueue({ ...mockDiff, filePath: 'src/bar.ts' });
+    q.enqueue({
+      ...mockDiff,
+      blocks: [{ search: 'other\n', replace: 'new\n' }],
+    });
+    expect(q.pending).toHaveLength(3);
   });
 });

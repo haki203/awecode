@@ -40,7 +40,7 @@ describe('ApprovalView', () => {
     expect(frame).toContain('new');
   });
 
-  it('shows action keys y/n/e/s', () => {
+  it('shows action keys y/n/s (edit hint hidden until implemented)', () => {
     const onDecision = vi.fn();
     const { lastFrame } = render(
       <ApprovalView request={mockRequest} blockIndex={0} onDecision={onDecision} />,
@@ -48,8 +48,10 @@ describe('ApprovalView', () => {
     const frame = lastFrame() ?? '';
     expect(frame).toContain('[y]');
     expect(frame).toContain('[n]');
-    expect(frame).toContain('[e]');
     expect(frame).toContain('[s]');
+    // [e] edit was removed from the TUI (ApprovalDecision type still allows
+    // 'edit' for future use), so the hint must not be rendered.
+    expect(frame).not.toContain('[e]');
   });
 
   it('renders Block N/M indicator from the embedded DiffPreview', () => {
@@ -63,7 +65,6 @@ describe('ApprovalView', () => {
   it.each<[string, ApprovalDecision]>([
     ['y', 'accept'],
     ['n', 'reject'],
-    ['e', 'edit'],
     ['s', 'skip'],
   ])('fires onDecision(%s) → %s on keypress', (key, expected) => {
     const onDecision = vi.fn();
@@ -72,6 +73,15 @@ describe('ApprovalView', () => {
     );
     stdin.write(key);
     expect(onDecision).toHaveBeenCalledWith(expected);
+  });
+
+  it('does not bind the removed [e] edit key', () => {
+    const onDecision = vi.fn();
+    const { stdin } = render(
+      <ApprovalView request={mockRequest} blockIndex={0} onDecision={onDecision} />,
+    );
+    stdin.write('e');
+    expect(onDecision).not.toHaveBeenCalled();
   });
 
   it('does not fire onDecision for unrelated keys', () => {

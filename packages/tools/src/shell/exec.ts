@@ -40,9 +40,17 @@ export async function shellExecTool(args: ShellExecArgs): Promise<ToolResult> {
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
-      // Force kill if still alive after 2s
+      // Force kill after a grace window. Per Node docs, `kill()` on an
+      // already-dead child throws ESRCH; wrap it so the SIGKILL path is not
+      // dead code (the prior `!child.killed` check was always true because
+      // the SIGTERM above flips it). The try/catch makes the call idempotent
+      // if the child already exited.
       setTimeout(() => {
-        if (!child.killed) child.kill('SIGKILL');
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          /* already reaped */
+        }
       }, 2000);
     }, timeout);
 

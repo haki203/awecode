@@ -25,13 +25,22 @@ export type ApprovalDecision = 'accept' | 'reject' | 'edit' | 'skip';
 
 export class ApprovalQueue {
   private queue: ApprovalRequest[] = [];
+  // Content-hash → original request. A model that resends the same block
+  // across iterations would otherwise enqueue identical approval requests;
+  // we silently drop the duplicate and return the first-seen request. Entries
+  // persist across dequeue() so a diff already reviewed cannot re-enter.
+  private seen: Map<string, ApprovalRequest> = new Map();
 
   enqueue(parsed: ParsedDiff): ApprovalRequest {
+    const key = diffHash(parsed);
+    const existing = this.seen.get(key);
+    if (existing) return existing;
     const req: ApprovalRequest = {
       id: randomUUID(),
       parsedDiff: parsed,
       filePath: parsed.filePath,
     };
+    this.seen.set(key, req);
     this.queue.push(req);
     return req;
   }
@@ -47,4 +56,21 @@ export class ApprovalQueue {
   get isEmpty(): boolean {
     return this.queue.length === 0;
   }
+}
+
+/**
+ * Stable content hash for a ParsedDiff so the queue can detect re-emitted
+ * blocks. JSON.stringify is deterministic given identical key order, which the
+ * parser produces; collisions across semantically-different diffs are not a
+ * concern in practice (worst case: a genuinely different block is skipped).
+ */
+function diffHash(parsed: ParsedDiff): string {
+  return JSON.stringify({
+    filePath: parsed.filePath,
+    blocks: parsed.blocks.map((b) => ({
+      search: b.search,
+      replace: b.replace,
+      anchor: b.anchor,
+    })),
+  });
 }

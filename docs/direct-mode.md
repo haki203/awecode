@@ -55,13 +55,13 @@ For each Diff Block the overlay shows:
 
 - Target file path and current block index (`block 2 of 4`)
 - A rendered diff preview
-- Four actions:
+- Three actions:
 
 | Key | Action | Behavior |
 |-----|--------|----------|
 | `y` | accept | Apply block to disk, refresh Context Manager |
 | `n` | reject | Discard block, do not apply |
-| `e` | edit   | Not yet implemented — planned to open diff in `$EDITOR` for manual refinement. Currently advances to the next block (functionally identical to `s`). |
+| `e` | edit   | Removed — will return via `$EDITOR` integration in a future release. The `ApprovalDecision` type still carries `'edit'` for forward compatibility, but the TUI no longer renders the hint nor binds the key. |
 | `s` | skip   | Skip this block, continue to next |
 
 Multiple blocks (from one or more queued diffs) are reviewed sequentially.
