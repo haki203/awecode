@@ -110,6 +110,7 @@ __metadata:
     "@awecode/diff": "workspace:*"
     "@awecode/harness": "workspace:*"
     "@awecode/llm": "workspace:*"
+    "@awecode/workflow": "workspace:*"
     "@inkjs/ui": "npm:^2.0.0"
     "@types/node": "npm:^26.0.0"
     "@types/react": "npm:^19.2.17"
@@ -183,7 +184,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@awecode/workflow@workspace:packages/workflow":
+"@awecode/workflow@workspace:*, @awecode/workflow@workspace:packages/workflow":
   version: 0.0.0-use.local
   resolution: "@awecode/workflow@workspace:packages/workflow"
   dependencies:
