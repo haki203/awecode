@@ -1,7 +1,7 @@
 import { parse } from 'yaml';
 import type { Skill, SkillFrontmatter, SkillSource } from './types.js';
 
-const FRONTMATTER_RE = /^---\n([\s\S]+?)\n---\n([\s\S]+)$/;
+const FRONTMATTER_RE = /^---\r?\n([\s\S]+?)\r?\n---(?:\r?\n([\s\S]*))?$/;
 
 export function parseSkillMarkdown(
   content: string,
@@ -9,11 +9,13 @@ export function parseSkillMarkdown(
   sourcePath: SkillSource = 'project',
 ): Skill {
   const match = content.match(FRONTMATTER_RE);
-  if (!match || !match[1] || !match[2]) {
+  if (!match || !match[1]) {
     throw new Error(
       `Skill ${filePath} missing frontmatter. Expected ---\n<yaml>\n---\n<markdown body>.`,
     );
   }
+
+  const body = match[2] ?? '';
 
   let frontmatter: SkillFrontmatter;
   try {
@@ -34,7 +36,7 @@ export function parseSkillMarkdown(
     name: frontmatter.name,
     description: frontmatter.description,
     frontmatter,
-    body: match[2],
+    body,
     sourcePath,
     filePath,
   };

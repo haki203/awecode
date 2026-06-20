@@ -62,4 +62,21 @@ const x: number = 1;
     expect(skill.body).toContain('```typescript');
     expect(skill.body).toContain('## Steps');
   });
+
+  it('handles CRLF (Windows) line endings', () => {
+    const content = "---\r\nname: brainstorm\r\ndescription: Explore intent\r\n---\r\n\r\n# Brainstorming";
+    const skill = parseSkillMarkdown(content, '/x');
+    expect(skill.name).toBe('brainstorm');
+    expect(skill.body).toContain('# Brainstorming');
+  });
+
+  it('handles empty body (no trailing newline after frontmatter)', () => {
+    const content = `---
+name: spec
+description: Write design doc
+---`;
+    const skill = parseSkillMarkdown(content, '/x');
+    expect(skill.name).toBe('spec');
+    expect(skill.body).toBe('');
+  });
 });
