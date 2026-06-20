@@ -20,4 +20,7 @@ export {
   createDiffEntry,
 } from './context/entry.js';
 
+export { ContextManager } from './context/manager.js';
+export type { AddFileArgs } from './context/manager.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
