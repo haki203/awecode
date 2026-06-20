@@ -12,4 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export type {
+  Worktree,
+  SandboxMode,
+  SandboxConfig,
+  SelfHealConfig,
+  SelfHealEvent,
+} from './types.js';
+
 export const HARNESS_PACKAGE_VERSION = '0.0.0';
