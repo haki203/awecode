@@ -36,4 +36,7 @@ export type { SelfHealCallbacks, RunCommandFn } from './selfheal.js';
 export { mergeToWorkingDir } from './merge.js';
 export type { MergeOptions, MergeResult } from './merge.js';
 
+export { commitDiff } from './commit.js';
+export type { CommitStrategy, CommitOptions, CommitResult } from './commit.js';
+
 export const HARNESS_PACKAGE_VERSION = '0.0.0';
