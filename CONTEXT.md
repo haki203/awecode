@@ -17,8 +17,12 @@ A SKILL.md document that teaches the agent how to execute a Workflow phase. Skil
 _Avoid_: plugin (reserved for v0.2+ external extensions), module (overloaded with package modules)
 
 **Worktree**:
-A git worktree under `.awecode/worktrees/<uuid>/` where the agent applies diffs and runs commands in isolation from the user's working directory. Lifecycle bounded by the Task; garbage-collected after 24h of session exit.
+A git worktree under `.awecode/worktrees/<uuid>/` where the agent applies diffs and runs commands in isolation from the user's working directory. Lifecycle bounded by the **Diff Cycle** (one worktree per LLM diff response); garbage-collected after 24h of session exit.
 _Avoid_: shadow directory (we don't use copy/symlink — only native git worktree), sandbox (sandbox is the security layer; worktree is the isolation unit)
+
+**Diff Cycle**:
+One iteration from LLM emits diff → approval → worktree create → apply → self-heal → merge → commit → worktree cleanup. A Task has many Diff Cycles; each cycle owns one Worktree. User-visible in TUI and logs (e.g. "cycle 2/5 failed").
+_Avoid_: turn (overloaded — a turn is one user message + agent reply; a cycle is specifically the diff→merge pipeline), iteration (too generic)
 
 **Direct Mode**:
 The agent state when no Workflow is active. The agent receives a prompt and responds directly (chat-style) without going through brainstorm→spec→grill→plan phases. Used for simple Tasks (typo fix, single-file edit, factual query).
@@ -55,11 +59,12 @@ _Avoid_: compression (overloaded with gzip), summarization (too generic — Comp
 ## Relationships
 
 - A **Task** runs in exactly one mode at a time: **Direct Mode** or a **Workflow**
-- A **Task** owns one or more **Worktrees** and a stream of **Context Entries**
+- A **Task** owns many **Diff Cycles** (across its lifetime) and a stream of **Context Entries**
+- Each **Diff Cycle** owns exactly one **Worktree** (created at cycle start, removed at cycle end)
 - A **Task** transitions from Direct Mode into a **Workflow** via an **Intent Declaration**
 - A **Workflow** is composed of **Skills** invoked via `invoke_skill()`
 - Each **Diff Block** targets one file and is reviewed in **Approval Mode**
-- A **Self-heal Loop** runs inside a **Worktree** and produces **Diff Blocks**
+- A **Self-heal Loop** runs inside a **Worktree** during a **Diff Cycle** and produces replacement **Diff Blocks**
 - A **Repo Map** is a special kind of **Context Entry**
 
 ## Example dialogue
@@ -83,3 +88,4 @@ _Avoid_: compression (overloaded with gzip), summarization (too generic — Comp
 - "shadow workspace" in early brainstorming — resolved: rejected in favor of **Worktree** (native git worktree, not copy-based shadow directory).
 - "chat mode" / "normal mode" used informally for the no-workflow state — resolved: canonical term is **Direct Mode**.
 - "plugin" vs "skill" overlap — resolved: **Skill** ships in v0.1 (SKILL.md prompt + tool composition); **Plugin** (native code package) deferred to v0.2+.
+- "worktree lifecycle bounded by Task" was ambiguous (early CONTEXT.md said Task-bounded; Plan 4 implementation suggested per-diff) — resolved (Plan 6 grill Q1): **Worktree** lifecycle is bounded by the **Diff Cycle** (one worktree per LLM diff response, across the Task's many cycles). **Diff Cycle** added as canonical term.
