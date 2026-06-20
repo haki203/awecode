@@ -23,4 +23,7 @@ export type {
 export { parseFile } from './parser.js';
 export type { ParseFileResult } from './parser.js';
 
+export { rankSymbols } from './ranker.js';
+export type { RankerOptions } from './ranker.js';
+
 export const REPOMAP_PACKAGE_VERSION = '0.0.0';
