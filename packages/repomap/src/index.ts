@@ -12,4 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export type {
+  SymbolKind,
+  ParsedSymbol,
+  RankedSymbol,
+  RankedFile,
+  RepoMapCacheData,
+} from './types.js';
+
 export const REPOMAP_PACKAGE_VERSION = '0.0.0';
