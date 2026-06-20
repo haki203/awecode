@@ -6,7 +6,8 @@
     { "path": "packages/diff" },
     { "path": "packages/tools" },
     { "path": "packages/agent" },
-    { "path": "packages/harness" }
+    { "path": "packages/harness" },
+    { "path": "packages/workflow" }
   ],
   "files": []
 }
