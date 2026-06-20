@@ -23,6 +23,7 @@ export function parseSkillMarkdown(
   } catch (err) {
     throw new Error(
       `Skill ${filePath} has malformed YAML frontmatter: ${(err as Error).message}`,
+      { cause: err },
     );
   }
 
