@@ -4,7 +4,6 @@ import type {
   SandboxMode,
   SandboxConfig,
   SelfHealConfig,
-  SelfHealEvent,
 } from '../src/types.js';
 
 describe('harness types', () => {

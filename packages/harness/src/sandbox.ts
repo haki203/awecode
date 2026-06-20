@@ -26,7 +26,7 @@ export interface NetworkIsolationHandle {
  * but no network blocking. See spec section 5.4 for future plan.
  */
 export async function enableNetworkIsolation(
-  pid: number,
+  _pid: number,
 ): Promise<NetworkIsolationHandle | null> {
   const p = platform();
   const platformName =

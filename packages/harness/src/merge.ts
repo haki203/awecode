@@ -33,7 +33,7 @@ export async function mergeToWorkingDir(
 
   if (options.mode === 'git-merge') {
     try {
-      const result = await git.merge([worktree.branch, '--no-edit']);
+      await git.merge([worktree.branch, '--no-edit']);
 
       // Check for conflicts
       // simple-git returns conflicts in result.conflicts or via status

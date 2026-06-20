@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { simpleGit } from 'simple-git';
 import { createWorktree } from '../src/worktree.js';
-import { runCommand, type RunCommandResult } from '../src/shell.js';
+import { runCommand } from '../src/shell.js';
 
 let tmpProject: string;
 
