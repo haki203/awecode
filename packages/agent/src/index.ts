@@ -32,4 +32,7 @@ export type { IntentDeclaration } from './intent.js';
 export { runChatLoop, DEFAULT_SYSTEM_PROMPT } from './chat.js';
 export type { ChatLoopOptions } from './chat.js';
 
+export { compactContext } from './context/compact.js';
+export type { CompactionResult } from './context/compact.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
