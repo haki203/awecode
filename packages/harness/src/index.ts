@@ -39,4 +39,7 @@ export type { MergeOptions, MergeResult } from './merge.js';
 export { commitDiff } from './commit.js';
 export type { CommitStrategy, CommitOptions, CommitResult } from './commit.js';
 
+export { enableNetworkIsolation } from './sandbox.js';
+export type { NetworkIsolationHandle } from './sandbox.js';
+
 export const HARNESS_PACKAGE_VERSION = '0.0.0';
