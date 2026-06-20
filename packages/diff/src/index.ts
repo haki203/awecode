@@ -12,4 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export type {
+  Anchor,
+  DiffBlock,
+  ParsedDiff,
+  ApplyResult,
+  SuggestionMatch,
+  AnchorResult,
+} from './types.js';
+
 export const DIFF_PACKAGE_VERSION = '0.0.0';
