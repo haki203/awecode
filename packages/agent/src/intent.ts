@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type { ContextEntry, ContextEntryType } from './context/entry.js';
-export {
-  createEntry,
-  createFileEntry,
-  createCommandOutputEntry,
-  createDiffEntry,
-} from './context/entry.js';
+export type IntentDeclaration =
+  | { type: 'direct' }
+  | { type: 'workflow'; name: string };
 
-export { ContextManager } from './context/manager.js';
-export type { AddFileArgs } from './context/manager.js';
+const WORKFLOW_RE = /start_workflow\(["']([\w-]+)["']\)/;
 
-export { ApprovalQueue } from './approval.js';
-export type { ApprovalRequest, ApprovalDecision } from './approval.js';
-
-export { detectIntentFromText } from './intent.js';
-export type { IntentDeclaration } from './intent.js';
-
-export const AGENT_PACKAGE_VERSION = '0.0.0';
+export function detectIntentFromText(content: string): IntentDeclaration {
+  if (typeof content !== 'string') return { type: 'direct' };
+  const match = content.match(WORKFLOW_RE);
+  if (match && match[1]) {
+    return { type: 'workflow', name: match[1] };
+  }
+  return { type: 'direct' };
+}
