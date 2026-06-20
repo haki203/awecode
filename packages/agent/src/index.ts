@@ -12,4 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export type { ContextEntry, ContextEntryType } from './context/entry.js';
+export {
+  createEntry,
+  createFileEntry,
+  createCommandOutputEntry,
+  createDiffEntry,
+} from './context/entry.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
