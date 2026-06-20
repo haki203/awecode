@@ -22,4 +22,6 @@ export type {
   InvokeSkillResult,
 } from './types.js';
 
+export { parseSkillMarkdown } from './parser.js';
+
 export const WORKFLOW_PACKAGE_VERSION = '0.0.0';
