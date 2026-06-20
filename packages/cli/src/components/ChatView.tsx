@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { Box, Text } from 'ink';
+import type { ReactNode } from 'react';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
@@ -22,17 +23,14 @@ export interface ChatMessage {
 interface Props {
   messages: ChatMessage[];
   isStreaming: boolean;
-  workflowIndicator?: { name: string; phase: string } | null;
+  workflowIndicator?: ReactNode | null;
 }
 
 export function ChatView({ messages, isStreaming, workflowIndicator }: Props) {
   return (
     <Box flexDirection="column">
-      {workflowIndicator && (
-        <Box marginBottom={1}>
-          <Text color="magenta">⚡ Workflow: {workflowIndicator.name}</Text>
-          <Text dimColor> ({workflowIndicator.phase})</Text>
-        </Box>
+      {workflowIndicator != null && (
+        <Box marginBottom={1}>{workflowIndicator}</Box>
       )}
       {messages.map((msg, i) => (
         <Box key={i} marginBottom={i < messages.length - 1 ? 1 : 0}>

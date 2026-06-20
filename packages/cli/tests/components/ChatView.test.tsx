@@ -16,6 +16,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { ChatView } from '../../src/components/ChatView.js';
+import { WorkflowIndicator } from '../../src/components/WorkflowIndicator.js';
 
 describe('ChatView', () => {
   it('renders user and assistant messages', () => {
@@ -69,7 +70,7 @@ describe('ChatView', () => {
       <ChatView
         messages={[]}
         isStreaming={false}
-        workflowIndicator={{ name: 'brainstorm', phase: 'round 1' }}
+        workflowIndicator={<WorkflowIndicator workflow="brainstorm" phase="round 1" />}
       />,
     );
     const frame = lastFrame() ?? '';

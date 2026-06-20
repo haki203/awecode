@@ -27,6 +27,10 @@ import {
 import { ChatView, type ChatMessage } from '../components/ChatView.js';
 import { ContextPanel } from '../components/ContextPanel.js';
 import { ApprovalView } from '../components/ApprovalView.js';
+import { WorkflowIndicator } from '../components/WorkflowIndicator.js';
+import { dispatchSlash, type SlashContext } from '../slash/index.js';
+import { registerWorkflowSlashCommands } from '../slash/workflow.js';
+import { registerCompactionSlashCommands } from '../slash/compaction.js';
 import { readFile, writeFile } from 'node:fs/promises';
 
 interface ChatAppProps {
@@ -63,6 +67,17 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // exit so streamText stops hitting the provider after the Ink app tears
   // down. Cleared in handleSubmit's finally.
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Intent Declaration: when the agent emits start_workflow(), we capture the
+  // workflow name + phase to drive the WorkflowIndicator header. Cleared back
+  // to null when the agent returns to Direct Mode.
+  const [workflow, setWorkflow] = useState<string | null>(null);
+  const [phase, setPhase] = useState<string | null>(null);
+  // Slash command context. projectRoot is resolved from cwd at render time;
+  // userSkillsDir is left empty until config exposes a skills path.
+  const slashCtx: SlashContext = {
+    projectRoot: process.cwd(),
+    userSkillsDir: '',
+  };
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar.toLowerCase() === 'c') {
@@ -85,6 +100,13 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   const handleSubmit = async (userInput: string) => {
     const trimmed = userInput.trim();
     if (trimmed === '') return;
+    // Slash commands short-circuit before any LLM call. They run even while a
+    // stream is in flight so the user can /smol or /tokens mid-response.
+    const slashHandled = await dispatchSlash(trimmed, slashCtx);
+    if (slashHandled) {
+      setInputKey((k) => k + 1);
+      return;
+    }
     // Guard against double-submit while streaming. Reads ref (sync) instead of
     // state to avoid the stale-closure trap inside an async event handler.
     if (streamingRef.current) return;
@@ -121,6 +143,16 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
           const parsed = parseDiff(diff);
           for (const p of parsed) {
             queueRef.current.enqueue(p);
+          }
+        },
+        onIntentDeclared: (intent) => {
+          if (intent.type === 'workflow') {
+            setWorkflow(intent.name);
+            setPhase(null);
+          } else {
+            // Direct Mode — clear the workflow indicator.
+            setWorkflow(null);
+            setPhase(null);
           }
         },
       });
@@ -229,7 +261,13 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
         />
       </Box>
       <Box flexDirection="column" paddingX={1} width="60%">
-        <ChatView messages={messages} isStreaming={isStreaming} workflowIndicator={null} />
+        <ChatView
+          messages={messages}
+          isStreaming={isStreaming}
+          workflowIndicator={
+            workflow ? <WorkflowIndicator workflow={workflow} phase={phase} /> : null
+          }
+        />
         <Box marginTop={1}>
           {!isStreaming && (
             <TextInput
@@ -254,6 +292,11 @@ export async function chatCommand(initialPrompt?: string): Promise<void> {
   }
 
   const context = new ContextManager();
+
+  // Register slash commands (idempotent — registerSlashCommand replaces any
+  // existing entry with the same name). Safe to call on every chat startup.
+  registerWorkflowSlashCommands();
+  registerCompactionSlashCommands();
 
   render(<ChatApp context={context} config={config} initialPrompt={initialPrompt} />);
 }
