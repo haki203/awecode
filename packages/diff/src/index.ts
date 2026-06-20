@@ -24,3 +24,5 @@ export type {
 export const DIFF_PACKAGE_VERSION = '0.0.0';
 
 export { parseDiff } from './parse.js';
+export { fuzzyMatch } from './fuzzy.js';
+export type { MatchResult } from './fuzzy.js';
