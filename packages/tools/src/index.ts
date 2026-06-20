@@ -28,4 +28,7 @@ export type { ListFilesArgs } from './file/list.js';
 export { searchFilesTool, searchFilesDef } from './file/search.js';
 export type { SearchFilesArgs } from './file/search.js';
 
+export { shellExecTool, shellExecDef } from './shell/exec.js';
+export type { ShellExecArgs } from './shell/exec.js';
+
 export const TOOLS_PACKAGE_VERSION = '0.0.0';
