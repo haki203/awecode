@@ -178,6 +178,7 @@ __metadata:
   dependencies:
     "@types/node": "npm:^26.0.0"
     simple-git: "npm:^3.27.0"
+    tree-sitter-wasms: "npm:^0.1.13"
     tsup: "npm:^8.5.1"
     typescript: "npm:^6.0.3"
     vitest: "npm:^4.1.9"
@@ -3234,6 +3235,15 @@ __metadata:
   bin:
     tree-kill: cli.js
   checksum: 10c0/7b1b7c7f17608a8f8d20a162e7957ac1ef6cd1636db1aba92f4e072dc31818c2ff0efac1e3d91064ede67ed5dc57c565420531a8134090a12ac10cf792ab14d2
+  languageName: node
+  linkType: hard
+
+"tree-sitter-wasms@npm:^0.1.11, tree-sitter-wasms@npm:^0.1.13":
+  version: 0.1.13
+  resolution: "tree-sitter-wasms@npm:0.1.13"
+  dependencies:
+    tree-sitter-wasms: "npm:^0.1.11"
+  checksum: 10c0/d3e72cff8d83e70344613f2c116a35b6d81cfb2f30c54fd1204e5c8dbd47c28e3434437fc6b7c5d0a1612455e8ca928044257e4903c79afea932ed6a0b234a7a
   languageName: node
   linkType: hard
 

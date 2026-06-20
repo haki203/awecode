@@ -20,4 +20,7 @@ export type {
   RepoMapCacheData,
 } from './types.js';
 
+export { parseFile } from './parser.js';
+export type { ParseFileResult } from './parser.js';
+
 export const REPOMAP_PACKAGE_VERSION = '0.0.0';
