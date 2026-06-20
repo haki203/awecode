@@ -86,7 +86,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@awecode/agent@workspace:packages/agent":
+"@awecode/agent@workspace:*, @awecode/agent@workspace:packages/agent":
   version: 0.0.0-use.local
   resolution: "@awecode/agent@workspace:packages/agent"
   dependencies:
@@ -106,6 +106,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@awecode/cli@workspace:packages/cli"
   dependencies:
+    "@awecode/agent": "workspace:*"
+    "@awecode/diff": "workspace:*"
     "@awecode/llm": "workspace:*"
     "@inkjs/ui": "npm:^2.0.0"
     "@types/node": "npm:^26.0.0"

@@ -1,0 +1,63 @@
+// Copyright 2026 Awecode Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import { Box, Text } from 'ink';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+}
+
+interface Props {
+  messages: ChatMessage[];
+  isStreaming: boolean;
+  workflowIndicator?: { name: string; phase: string } | null;
+}
+
+export function ChatView({ messages, isStreaming, workflowIndicator }: Props) {
+  return (
+    <Box flexDirection="column">
+      {workflowIndicator && (
+        <Box marginBottom={1}>
+          <Text color="magenta">⚡ Workflow: {workflowIndicator.name}</Text>
+          <Text dimColor> ({workflowIndicator.phase})</Text>
+        </Box>
+      )}
+      {messages.map((msg, i) => (
+        <Box key={i} marginBottom={i < messages.length - 1 ? 1 : 0}>
+          {msg.role === 'user' && (
+            <Text>
+              <Text bold color="cyan">You: </Text>
+              {msg.content}
+            </Text>
+          )}
+          {msg.role === 'assistant' && (
+            <Text>
+              <Text bold color="green">Agent: </Text>
+              {msg.content}
+            </Text>
+          )}
+          {msg.role === 'tool' && (
+            <Text dimColor>[tool] {msg.content.slice(0, 200)}</Text>
+          )}
+        </Box>
+      ))}
+      {isStreaming && (
+        <Text color="yellow">
+          <Text bold>●</Text> thinking...
+        </Text>
+      )}
+    </Box>
+  );
+}
