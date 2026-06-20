@@ -58,7 +58,10 @@ Config: ~/.config/awecode/config.yaml
   // Unknown tokens are treated as the first prompt rather than erroring out,
   // matching the common "awecode fix the bug in foo.ts" UX.
   const { chatCommand } = await import('./commands/chat.js');
-  void chatCommand();
+  // Explicit `chat` command opens an empty prompt; any other unknown token is
+  // threaded as the initial user prompt.
+  const initialPrompt = args[0] === 'chat' || args[0] === undefined ? undefined : args[0];
+  await chatCommand(initialPrompt);
 }
 
 main().catch((err) => {

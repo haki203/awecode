@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { render, Box, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { loadConfig, getDefaultConfigPath, type AwecodeConfig } from '@awecode/llm';
@@ -32,9 +32,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 interface ChatAppProps {
   context: ContextManager;
   config: AwecodeConfig;
+  initialPrompt?: string;
 }
 
-function ChatApp({ context, config }: ChatAppProps) {
+function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   const { exit } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // TextInput from @inkjs/ui v2 is uncontrolled (no `value` prop). We bump
@@ -55,6 +56,9 @@ function ChatApp({ context, config }: ChatAppProps) {
   // Tracks whether an approval overlay is already open so onDiffDetected
   // doesn't fight the post-stream pumpApproval.
   const approvalOpenRef = useRef(false);
+  // Guards the initialPrompt auto-submit against React StrictMode's
+  // double-invoke of effects in development.
+  const initialSubmitRef = useRef(false);
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar.toLowerCase() === 'c') {
@@ -123,6 +127,16 @@ function ChatApp({ context, config }: ChatAppProps) {
       pumpApproval();
     }
   };
+
+  // Auto-submit the argv-provided prompt once on mount. Ref guard defends
+  // against StrictMode double-invocation so we never fire the prompt twice.
+  useEffect(() => {
+    if (!initialPrompt || initialSubmitRef.current) return;
+    initialSubmitRef.current = true;
+    void handleSubmit(initialPrompt);
+    // handleSubmit closes over stable state setters; only initialPrompt
+    // matters and it is available at mount. Empty deps are intentional.
+  }, []);
 
   const handleApproval = async (decision: ApprovalDecision) => {
     if (!currentApproval) return;
@@ -213,7 +227,7 @@ function ChatApp({ context, config }: ChatAppProps) {
   );
 }
 
-export async function chatCommand(): Promise<void> {
+export async function chatCommand(initialPrompt?: string): Promise<void> {
   const configPath = process.env.AWECODE_CONFIG_PATH ?? getDefaultConfigPath();
   const config = await loadConfig(configPath);
 
@@ -224,5 +238,5 @@ export async function chatCommand(): Promise<void> {
 
   const context = new ContextManager();
 
-  render(<ChatApp context={context} config={config} />);
+  render(<ChatApp context={context} config={config} initialPrompt={initialPrompt} />);
 }

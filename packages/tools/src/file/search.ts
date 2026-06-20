@@ -50,22 +50,20 @@ export async function searchFilesTool(args: SearchFilesArgs): Promise<ToolResult
 
   // Try ripgrep first (fast path).
   try {
-    const { stdout } = await execFileAsync(
-      'rg',
-      [
-        '--line-number',
-        '--no-heading',
-        '--color=never',
-        '--no-ignore',
-        '-g',
-        `!${DEFAULT_IGNORE[0] ?? ''}`,
-        '-g',
-        `!${DEFAULT_IGNORE[1] ?? ''}`,
-        args.pattern,
-        cwd,
-      ],
-      { timeout: 30_000 },
-    );
+    const rgArgs = [
+      '--line-number',
+      '--no-heading',
+      '--color=never',
+      '--no-ignore',
+    ];
+    // Emit `-g !<glob>` for every DEFAULT_IGNORE entry so rg skips the same
+    // directories the JS fallback does (.awecode/, dist/ included). Previously
+    // only indices [0] and [1] were passed, leaking hits from [2]/[3].
+    for (const ignoreGlob of DEFAULT_IGNORE) {
+      rgArgs.push('-g', `!${ignoreGlob}`);
+    }
+    rgArgs.push(args.pattern, cwd);
+    const { stdout } = await execFileAsync('rg', rgArgs, { timeout: 30_000 });
     return { ok: true, output: stdout.split('\n').map(normalizeLine).join('\n').trim() };
   } catch (err) {
     // execFile rejects on non-zero exit OR spawn failure:
