@@ -23,4 +23,7 @@ export {
 export { ContextManager } from './context/manager.js';
 export type { AddFileArgs } from './context/manager.js';
 
+export { ApprovalQueue } from './approval.js';
+export type { ApprovalRequest, ApprovalDecision } from './approval.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
