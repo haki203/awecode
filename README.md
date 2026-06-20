@@ -19,6 +19,10 @@ awecode chat-test
 # Enter Direct Mode TUI (no args), or pass a prompt directly
 awecode
 awecode "fix typo 'recieve' -> 'receive' in src/foo.ts"
+
+# Manage agent worktrees (see docs/harness.md)
+awecode worktree list
+awecode worktree clean
 ```
 
 In Direct Mode, the agent streams a response and, when it emits a Diff Block,
