@@ -26,4 +26,12 @@ export type { ParseFileResult } from './parser.js';
 export { rankSymbols } from './ranker.js';
 export type { RankerOptions } from './ranker.js';
 
+export {
+  getCachePath,
+  getCommitHash,
+  loadCachedMap,
+  saveCachedMap,
+  getOrGenerateMap,
+} from './cache.js';
+
 export const REPOMAP_PACKAGE_VERSION = '0.0.0';
