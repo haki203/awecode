@@ -86,6 +86,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@awecode/agent@workspace:packages/agent":
+  version: 0.0.0-use.local
+  resolution: "@awecode/agent@workspace:packages/agent"
+  dependencies:
+    "@awecode/diff": "workspace:*"
+    "@awecode/llm": "workspace:*"
+    "@awecode/tools": "workspace:*"
+    "@types/node": "npm:^26.0.0"
+    ai: "npm:^6.0.208"
+    gpt-tokenizer: "npm:^2.5.0"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^6.0.3"
+    vitest: "npm:^4.1.9"
+  languageName: unknown
+  linkType: soft
+
 "@awecode/cli@workspace:packages/cli":
   version: 0.0.0-use.local
   resolution: "@awecode/cli@workspace:packages/cli"
@@ -107,7 +123,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@awecode/diff@workspace:packages/diff":
+"@awecode/diff@workspace:*, @awecode/diff@workspace:packages/diff":
   version: 0.0.0-use.local
   resolution: "@awecode/diff@workspace:packages/diff"
   dependencies:
@@ -138,7 +154,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@awecode/tools@workspace:packages/tools":
+"@awecode/tools@workspace:*, @awecode/tools@workspace:packages/tools":
   version: 0.0.0-use.local
   resolution: "@awecode/tools@workspace:packages/tools"
   dependencies:
@@ -1974,6 +1990,13 @@ __metadata:
   dependencies:
     is-glob: "npm:^4.0.3"
   checksum: 10c0/317034d88654730230b3f43bb7ad4f7c90257a426e872ea0bf157473ac61c99bf5d205fad8f0185f989be8d2fa6d3c7dce1645d99d545b6ea9089c39f838e7f8
+  languageName: node
+  linkType: hard
+
+"gpt-tokenizer@npm:^2.5.0":
+  version: 2.9.0
+  resolution: "gpt-tokenizer@npm:2.9.0"
+  checksum: 10c0/3733fbf045f81e71c475d0f2327e648600f5662079ef403a495efaed96fb20526877ee7f27dbee29ba73e8fa795b3405f07357fb4214abb84c5aae5be7ea902b
   languageName: node
   linkType: hard
 

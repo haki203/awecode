@@ -4,7 +4,8 @@
     { "path": "packages/llm" },
     { "path": "packages/cli" },
     { "path": "packages/diff" },
-    { "path": "packages/tools" }
+    { "path": "packages/tools" },
+    { "path": "packages/agent" }
   ],
   "files": []
 }
