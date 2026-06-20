@@ -30,4 +30,7 @@ export {
 export { runCommand } from './shell.js';
 export type { RunCommandResult } from './shell.js';
 
+export { runSelfHealLoop, DEFAULT_SELF_HEAL_CONFIG } from './selfheal.js';
+export type { SelfHealCallbacks, RunCommandFn } from './selfheal.js';
+
 export const HARNESS_PACKAGE_VERSION = '0.0.0';
