@@ -12,11 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type {
-  ToolDefinition,
-  ToolCall,
-  ToolResult,
-  ContextEntryPayload,
-} from './types.js';
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
 
-export const TOOLS_PACKAGE_VERSION = '0.0.0';
+export interface ToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ContextEntryPayload {
+  type: 'file' | 'command-output' | 'snippet';
+  path?: string;
+  content: string;
+}
+
+export type ToolResult =
+  | { ok: true; output: string; contextEntries?: ContextEntryPayload[] }
+  | { ok: false; error: string };
