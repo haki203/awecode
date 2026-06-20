@@ -25,4 +25,7 @@ export type { ReadFileArgs } from './file/read.js';
 export { listFilesTool, listFilesDef } from './file/list.js';
 export type { ListFilesArgs } from './file/list.js';
 
+export { searchFilesTool, searchFilesDef } from './file/search.js';
+export type { SearchFilesArgs } from './file/search.js';
+
 export const TOOLS_PACKAGE_VERSION = '0.0.0';
