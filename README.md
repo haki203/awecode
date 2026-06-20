@@ -2,7 +2,7 @@
 
 CLI Coding Agent with built-in workflow engine (brainstorm → spec → grill → plan).
 
-**Status:** v0.1 in development. Plans 1-3 complete (Foundation + LLM Adapter, Diff Engine, Direct Mode).
+**Status:** v0.1 in development. Plans 1-5a complete (Foundation + LLM Adapter, Diff Engine, Direct Mode, Harness, Workflow Engine).
 
 ## Quick start
 
@@ -35,6 +35,12 @@ switches to Approval Mode:
 ```
 
 See [docs/direct-mode.md](./docs/direct-mode.md) for the full Direct Mode guide.
+
+## Workflows
+
+For creative/complex tasks, the agent auto-emits `start_workflow("brainstorm")` and runs the brainstorm → spec → grill → plan pipeline. Skip with `/skip-workflow` or invoke phases individually via slash commands (`/brainstorm`, `/spec`, `/grill`, `/plan`).
+
+See [docs/workflows.md](./docs/workflows.md) for the full Workflow Engine guide.
 
 ## Development
 
