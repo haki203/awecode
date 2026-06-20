@@ -15,13 +15,15 @@
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
-  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+  if (args[0] === '--help' || args[0] === '-h') {
     console.log(`awecode - CLI Coding Agent with workflow engine
 
 USAGE:
+  awecode [prompt]        Start Direct Mode chat (default)
   awecode <command> [options]
 
 COMMANDS:
+  (default)       Direct Mode chat — interactive agent TUI
   config          Interactive LLM provider setup
   chat-test       Smoke test: send "hello" to active provider
   --version, -v   Print version
@@ -52,8 +54,11 @@ Config: ~/.config/awecode/config.yaml
     return;
   }
 
-  console.error(`Unknown command: ${args[0]}. Run 'awecode --help' for usage.`);
-  process.exit(1);
+  // Default: no args, explicit "chat", or any unknown token → Direct Mode chat.
+  // Unknown tokens are treated as the first prompt rather than erroring out,
+  // matching the common "awecode fix the bug in foo.ts" UX.
+  const { chatCommand } = await import('./commands/chat.js');
+  void chatCommand();
 }
 
 main().catch((err) => {

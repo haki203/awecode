@@ -22,7 +22,11 @@ interface Props {
 }
 
 export function ContextPanel({ entries, totalTokens, budget }: Props) {
-  const pct = budget > 0 ? Math.round((totalTokens / budget) * 100) : 0;
+  // Clamp to [0, 100] so a runaway totalTokens (> budget) can never overflow the
+  // 20-cell progress bar (`'░'.repeat(20 - ...)` would otherwise receive a
+  // negative arg and throw RangeError). See Task 15 review notes.
+  const rawPct = budget > 0 ? Math.round((totalTokens / budget) * 100) : 0;
+  const pct = Math.max(0, Math.min(100, rawPct));
   const color = pct >= 95 ? 'red' : pct >= 85 ? 'yellow' : 'green';
 
   return (
