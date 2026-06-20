@@ -27,3 +27,4 @@ export { parseDiff } from './parse.js';
 export { fuzzyMatch } from './fuzzy.js';
 export type { MatchResult } from './fuzzy.js';
 export { resolveAnchor } from './anchor.js';
+export { applyDiff } from './apply.js';
