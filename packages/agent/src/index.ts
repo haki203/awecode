@@ -38,4 +38,7 @@ export type { CompactionResult } from './context/compact.js';
 export { saveCheckpoint, loadCheckpoint, listCheckpoints } from './context/checkpoint.js';
 export type { Checkpoint } from './context/checkpoint.js';
 
+export { getCompactionTrigger } from './context/trigger.js';
+export type { CompactionTrigger } from './context/trigger.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
