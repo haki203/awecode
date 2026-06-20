@@ -20,6 +20,11 @@ export type {
   SelfHealEvent,
 } from './types.js';
 
-export { createWorktree } from './worktree.js';
+export {
+  createWorktree,
+  listWorktrees,
+  removeWorktree,
+  cleanStaleWorktrees,
+} from './worktree.js';
 
 export const HARNESS_PACKAGE_VERSION = '0.0.0';
