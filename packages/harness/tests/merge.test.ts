@@ -14,6 +14,9 @@ beforeEach(async () => {
   await git.init();
   await git.addConfig('user.email', 'test@test.com');
   await git.addConfig('user.name', 'Test');
+  // Pin LF line endings so file-content assertions are stable regardless of
+  // the host's global core.autocrlf setting (Windows CI often defaults to true).
+  await writeFile(join(tmpProject, '.gitattributes'), '* text=auto eol=lf\n', 'utf-8');
   await writeFile(join(tmpProject, 'foo.txt'), 'original\n', 'utf-8');
   await git.add(['.']);
   await git.commit('initial');
