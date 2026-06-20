@@ -26,6 +26,7 @@ COMMANDS:
   (default)       Direct Mode chat — interactive agent TUI
   config          Interactive LLM provider setup
   chat-test       Smoke test: send "hello" to active provider
+  worktree        Manage git worktrees (list, clean)
   --version, -v   Print version
   --help, -h      Show this help
 
@@ -51,6 +52,12 @@ Config: ~/.config/awecode/config.yaml
   if (args[0] === 'chat-test') {
     const { chatTestCommand } = await import('./commands/chat-test.js');
     await chatTestCommand();
+    return;
+  }
+
+  if (args[0] === 'worktree') {
+    const { worktreeCommand } = await import('./commands/worktree.js');
+    await worktreeCommand(args.slice(1));
     return;
   }
 

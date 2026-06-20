@@ -108,6 +108,7 @@ __metadata:
   dependencies:
     "@awecode/agent": "workspace:*"
     "@awecode/diff": "workspace:*"
+    "@awecode/harness": "workspace:*"
     "@awecode/llm": "workspace:*"
     "@inkjs/ui": "npm:^2.0.0"
     "@types/node": "npm:^26.0.0"
@@ -138,7 +139,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@awecode/harness@workspace:packages/harness":
+"@awecode/harness@workspace:*, @awecode/harness@workspace:packages/harness":
   version: 0.0.0-use.local
   resolution: "@awecode/harness@workspace:packages/harness"
   dependencies:
