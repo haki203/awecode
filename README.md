@@ -2,7 +2,7 @@
 
 CLI Coding Agent with built-in workflow engine (brainstorm → spec → grill → plan).
 
-**Status:** v0.1 in development. Plans 1-5a complete (Foundation + LLM Adapter, Diff Engine, Direct Mode, Harness, Workflow Engine).
+**Status:** v0.1 in development. Plans 1-5b complete (Foundation + LLM Adapter, Diff Engine, Direct Mode, Harness, Workflow Engine, TUI + Repo Map + Compaction).
 
 ## Quick start
 
