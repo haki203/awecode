@@ -172,6 +172,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@awecode/repomap@workspace:packages/repomap":
+  version: 0.0.0-use.local
+  resolution: "@awecode/repomap@workspace:packages/repomap"
+  dependencies:
+    "@types/node": "npm:^26.0.0"
+    simple-git: "npm:^3.27.0"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^6.0.3"
+    vitest: "npm:^4.1.9"
+    web-tree-sitter: "npm:^0.22.0"
+  languageName: unknown
+  linkType: soft
+
 "@awecode/tools@workspace:*, @awecode/tools@workspace:packages/tools":
   version: 0.0.0-use.local
   resolution: "@awecode/tools@workspace:packages/tools"
@@ -3479,6 +3492,13 @@ __metadata:
   bin:
     vitest: ./vitest.mjs
   checksum: 10c0/1ac80ef4991be82822a52aea48415f1bc64ddf8fd88ee24c172ec368f1d480fefacbde622c3c951982f7961a1d07313e18deaafc774d29e42ad6f6ffa63334a7
+  languageName: node
+  linkType: hard
+
+"web-tree-sitter@npm:^0.22.0":
+  version: 0.22.6
+  resolution: "web-tree-sitter@npm:0.22.6"
+  checksum: 10c0/ac90117dec9127edfd98432977b62d12fed4889929f375045b728ea2ae6b1ed402de61ffd98324073f8bc3f6bb36fa7292f45d7c613c7abb4819f693a7672e31
   languageName: node
   linkType: hard
 
