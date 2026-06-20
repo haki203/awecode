@@ -19,13 +19,36 @@ interface Props {
   block: DiffBlock;
   blockIndex: number;
   totalBlocks: number;
+  filePath?: string;
 }
 
-export function DiffPreview({ block, blockIndex, totalBlocks }: Props) {
+function getLanguage(filePath?: string): string {
+  if (!filePath) return 'typescript';
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'ts': return 'typescript';
+    case 'tsx': return 'tsx';
+    case 'js': return 'javascript';
+    case 'jsx': return 'jsx';
+    case 'py': return 'python';
+    case 'go': return 'go';
+    case 'rs': return 'rust';
+    case 'json': return 'json';
+    case 'yaml':
+    case 'yml': return 'yaml';
+    case 'md': return 'markdown';
+    default: return 'typescript';
+  }
+}
+
+export function DiffPreview({ block, blockIndex, totalBlocks, filePath }: Props) {
+  const lang = getLanguage(filePath);
+
   return (
     <Box flexDirection="column">
       <Text bold>
         Block {blockIndex + 1}/{totalBlocks}
+        <Text dimColor> ({lang})</Text>
         {block.anchor && (
           <Text dimColor> at: @{block.anchor.type} {block.anchor.symbol}</Text>
         )}
