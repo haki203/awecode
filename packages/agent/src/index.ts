@@ -35,4 +35,7 @@ export type { ChatLoopOptions } from './chat.js';
 export { compactContext } from './context/compact.js';
 export type { CompactionResult } from './context/compact.js';
 
+export { saveCheckpoint, loadCheckpoint, listCheckpoints } from './context/checkpoint.js';
+export type { Checkpoint } from './context/checkpoint.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
