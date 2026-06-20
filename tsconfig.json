@@ -5,7 +5,8 @@
     { "path": "packages/cli" },
     { "path": "packages/diff" },
     { "path": "packages/tools" },
-    { "path": "packages/agent" }
+    { "path": "packages/agent" },
+    { "path": "packages/harness" }
   ],
   "files": []
 }
