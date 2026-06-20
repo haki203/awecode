@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { DiffBlock, ParsedDiff, ApplyResult, Anchor } from '../src/types.js';
+import type { DiffBlock, ParsedDiff } from '../src/types.js';
 
 describe('types', () => {
   it('DiffBlock has search and replace', () => {

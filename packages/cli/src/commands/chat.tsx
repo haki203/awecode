@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React, { useState, useRef } from 'react';
-import { render, Box, Text, useInput, useApp } from 'ink';
+import { render, Box, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { loadConfig, getDefaultConfigPath, type AwecodeConfig } from '@awecode/llm';
 import { parseDiff, applyDiff } from '@awecode/diff';

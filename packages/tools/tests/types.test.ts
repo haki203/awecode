@@ -3,7 +3,6 @@ import type {
   ToolDefinition,
   ToolCall,
   ToolResult,
-  ContextEntryPayload,
 } from '../src/types.js';
 
 describe('Tool types', () => {
