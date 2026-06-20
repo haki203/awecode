@@ -12,4 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export type {
+  Skill,
+  SkillFrontmatter,
+  SkillSource,
+  WorkflowSession,
+  WorkflowHistoryEntry,
+  StartWorkflowResult,
+  InvokeSkillResult,
+} from './types.js';
+
 export const WORKFLOW_PACKAGE_VERSION = '0.0.0';
