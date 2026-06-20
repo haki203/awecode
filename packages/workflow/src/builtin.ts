@@ -12,17 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type {
-  Skill,
-  SkillFrontmatter,
-  SkillSource,
-  WorkflowSession,
-  WorkflowHistoryEntry,
-  StartWorkflowResult,
-  InvokeSkillResult,
-} from './types.js';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export { parseSkillMarkdown } from './parser.js';
-export { getBuiltInSkillsDir, listBuiltInSkillNames, BUILT_IN_SKILL_NAMES } from './builtin.js';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const WORKFLOW_PACKAGE_VERSION = '0.0.0';
+/**
+ * Path to built-in skills directory.
+ * In dev: packages/workflow/skills/
+ * In production (after build + npm install): node_modules/@awecode/workflow/skills/
+ */
+export function getBuiltInSkillsDir(): string {
+  return join(__dirname, '..', 'skills');
+}
+
+export const BUILT_IN_SKILL_NAMES = ['brainstorm', 'spec', 'grill', 'plan'] as const;
+
+export function listBuiltInSkillNames(): readonly string[] {
+  return BUILT_IN_SKILL_NAMES;
+}
