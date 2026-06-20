@@ -29,4 +29,7 @@ export type { ApprovalRequest, ApprovalDecision } from './approval.js';
 export { detectIntentFromText } from './intent.js';
 export type { IntentDeclaration } from './intent.js';
 
+export { runChatLoop, DEFAULT_SYSTEM_PROMPT } from './chat.js';
+export type { ChatLoopOptions } from './chat.js';
+
 export const AGENT_PACKAGE_VERSION = '0.0.0';
