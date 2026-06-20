@@ -22,9 +22,9 @@ export function resolveAnchor(source: string, anchor: Anchor): AnchorResult {
     const current = lines[i];
     if (current !== undefined && new RegExp(pattern).test(current)) {
       // `after` resolves to the line immediately following the symbol's body
-      // (brace-matched); `before` resolves to the line after the declaration
-      // line so callers can splice content adjacent to the symbol.
-      const line = anchor.type === 'after' ? findBodyEnd(lines, i) + 1 : i + 1;
+      // (brace-matched); `before` resolves to the declaration line itself, so
+      // a splice inserts above the symbol.
+      const line = anchor.type === 'after' ? findBodyEnd(lines, i) + 1 : i;
       return { ok: true, line };
     }
   }

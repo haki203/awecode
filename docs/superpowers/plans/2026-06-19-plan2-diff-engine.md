@@ -6,7 +6,7 @@
 
 **Architecture:** Pure functions, no IO. `parseDiff()` parses LLM output → `ParsedDiff[]`. `applyDiff(source, blocks)` applies blocks to source string with fuzzy matching via `diff-match-patch`. Anchor resolution via regex symbol search.
 
-**Tech Stack:** TypeScript strict, `diff-match-patch` for fuzzy match, `zod` for runtime validation of LLM output structure.
+**Tech Stack:** TypeScript strict, `diff-match-patch` for fuzzy match.
 
 ## Global Constraints
 
@@ -34,8 +34,7 @@ packages/diff/
 │   ├── parse.ts            # parseDiff(llmOutput): ParsedDiff[]
 │   ├── fuzzy.ts            # fuzzyMatch(text, search): MatchResult
 │   ├── anchor.ts           # resolveAnchor(source, anchor): AnchorResult
-│   ├── apply.ts            # applyDiff(source, blocks): ApplyResult
-│   └── schema.ts           # zod schema for LLM output validation
+│   └── apply.ts            # applyDiff(source, blocks): ApplyResult
 └── tests/
     ├── parse.test.ts
     ├── fuzzy.test.ts
@@ -117,7 +116,7 @@ describe('sanity', () => {
 
 - [ ] **Step 5: Install deps**
 
-Run: `yarn workspace @awecode/diff add diff-match-patch zod`
+Run: `yarn workspace @awecode/diff add diff-match-patch`
 Run: `yarn workspace @awecode/diff add -D tsup vitest typescript @types/node @types/diff-match-patch`
 
 - [ ] **Step 6: Add `packages/diff` to root `tsconfig.json` references**

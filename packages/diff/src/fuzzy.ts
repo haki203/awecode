@@ -25,6 +25,11 @@ export type MatchResult =
 export function fuzzyMatch(text: string, search: string, threshold: number = DEFAULT_THRESHOLD): MatchResult {
   const dmp = new DMP();
 
+  // Empty search never matches — guard against infinite loop / false matches
+  if (search === '') {
+    return { ok: false, error: 'no_match', bestScore: 0, suggestions: [] };
+  }
+
   // First try exact match
   const exactIdx = text.indexOf(search);
   if (exactIdx !== -1) {

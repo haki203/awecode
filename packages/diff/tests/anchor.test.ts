@@ -23,7 +23,7 @@ describe('resolveAnchor', () => {
   it('finds class symbol @before', () => {
     const r = resolveAnchor(source, { type: 'before', symbol: 'class Bar' });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.line).toBe(5);
+    if (r.ok) expect(r.line).toBe(4);
   });
 
   it('returns not_found with suggestions when symbol missing', () => {
