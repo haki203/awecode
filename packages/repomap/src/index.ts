@@ -34,4 +34,6 @@ export {
   getOrGenerateMap,
 } from './cache.js';
 
+export { renderRepoMap } from './render.js';
+
 export const REPOMAP_PACKAGE_VERSION = '0.0.0';
