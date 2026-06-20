@@ -61,7 +61,7 @@ For each Diff Block the overlay shows:
 |-----|--------|----------|
 | `y` | accept | Apply block to disk, refresh Context Manager |
 | `n` | reject | Discard block, do not apply |
-| `e` | edit   | Open diff in `$EDITOR` (manual refinement) |
+| `e` | edit   | Not yet implemented — planned to open diff in `$EDITOR` for manual refinement. Currently advances to the next block (functionally identical to `s`). |
 | `s` | skip   | Skip this block, continue to next |
 
 Multiple blocks (from one or more queued diffs) are reviewed sequentially.
