@@ -27,4 +27,7 @@ export {
   cleanStaleWorktrees,
 } from './worktree.js';
 
+export { runCommand } from './shell.js';
+export type { RunCommandResult } from './shell.js';
+
 export const HARNESS_PACKAGE_VERSION = '0.0.0';
