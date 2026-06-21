@@ -20,6 +20,7 @@
     "@awecode/harness": "workspace:*",
     "@awecode/llm": "workspace:*",
     "@awecode/orchestrator": "workspace:*",
+    "@awecode/web": "workspace:*",
     "@awecode/workflow": "workspace:*",
     "@inkjs/ui": "^2.0.0",
     "@types/react": "^19.2.17",
