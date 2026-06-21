@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTransport } from '../transport/context.js';
 import type {
   ContextEntrySnapshot,
   GuiAgentEvent,
@@ -45,6 +46,8 @@ export interface UseAgent {
   send: (text: string) => void;
   abort: () => void;
   resetForSession: () => void;
+  /** Register a callback fired whenever the agent's 'done' event arrives. */
+  onDone: (cb: () => void) => () => void;
 }
 
 /**
@@ -53,6 +56,7 @@ export interface UseAgent {
  * instead of runChatLoop callbacks.
  */
 export function useAgent(): UseAgent {
+  const client = useTransport();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<AgentStatus>({});
   const [context, setContext] = useState<ContextState>({
@@ -64,9 +68,10 @@ export function useAgent(): UseAgent {
   const [workflow, setWorkflow] = useState<{ name: string } | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const streamingRef = useRef(false);
+  const doneCbs = useRef(new Set<() => void>());
 
   useEffect(() => {
-    const off = window.awecode.onEvent((ev: GuiAgentEvent) => {
+    const off = client.onEvent((ev: GuiAgentEvent) => {
       switch (ev.type) {
         case 'ready':
           setStatus({
@@ -139,11 +144,12 @@ export function useAgent(): UseAgent {
         case 'done':
           streamingRef.current = false;
           setIsStreaming(false);
+          doneCbs.current.forEach((cb) => cb());
           break;
       }
     });
     return off;
-  }, []);
+  }, [client]);
 
   const send = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -155,13 +161,13 @@ export function useAgent(): UseAgent {
     // Do NOT optimistically echo here — the CLI's internal-mode protocol
     // server emits a 'message'/'user' event back, which useAgent appends.
     // Echoing here too would double the user's message.
-    void window.awecode.send({ type: 'prompt', text });
-  }, []);
+    void client.send({ type: 'prompt', text });
+  }, [client]);
 
   const abort = useCallback(() => {
     if (!streamingRef.current) return;
-    void window.awecode.send({ type: 'abort' });
-  }, []);
+    void client.send({ type: 'abort' });
+  }, [client]);
 
   /**
    * Clear all transcript/UI state. Called when the user switches to a
@@ -179,6 +185,13 @@ export function useAgent(): UseAgent {
     streamingRef.current = false;
   }, []);
 
+  const onDone = useCallback((cb: () => void) => {
+    doneCbs.current.add(cb);
+    return () => {
+      doneCbs.current.delete(cb);
+    };
+  }, []);
+
   return {
     messages,
     status,
@@ -189,5 +202,6 @@ export function useAgent(): UseAgent {
     send,
     abort,
     resetForSession,
+    onDone,
   };
 }

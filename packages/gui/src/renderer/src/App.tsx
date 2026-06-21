@@ -21,6 +21,8 @@ import { StatusBar } from './components/StatusBar.js';
 import { ContextPanel } from './components/ContextPanel.js';
 import { WorkflowIndicator } from './components/WorkflowIndicator.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { TransportContext } from './transport/context.js';
+import { electronClient } from './transport/electron-client.js';
 import type { WorkspaceState } from '../../main/types.js';
 
 export function App() {
@@ -111,54 +113,56 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <div className="app-shell">
-        <Sidebar
-          activeId={activeSessionId}
-          workspace={workspace}
-          currentCwd={currentCwd}
-          onSelect={handleSelect}
-          onNew={handleNew}
-          onDelete={handleDelete}
-          onRename={handleRename}
-          onPickWorkspace={handlePick}
-          onSwitchWorkspace={handleSwitch}
-        />
-        <main className="app-main">
-          {agent.workflow && <WorkflowIndicator name={agent.workflow.name} />}
-          <div className="app-body">
-            {showContext ? (
-              <ContextPanel
-                entries={agent.context.entries}
-                totalTokens={agent.context.totalTokens}
-                budgetTokens={agent.context.budgetTokens}
-                onClose={() => setShowContext(false)}
-              />
-            ) : (
-              <ChatView
-                messages={agent.messages}
+      <TransportContext.Provider value={electronClient}>
+        <div className="app-shell">
+          <Sidebar
+            activeId={activeSessionId}
+            workspace={workspace}
+            currentCwd={currentCwd}
+            onSelect={handleSelect}
+            onNew={handleNew}
+            onDelete={handleDelete}
+            onRename={handleRename}
+            onPickWorkspace={handlePick}
+            onSwitchWorkspace={handleSwitch}
+          />
+          <main className="app-main">
+            {agent.workflow && <WorkflowIndicator name={agent.workflow.name} />}
+            <div className="app-body">
+              {showContext ? (
+                <ContextPanel
+                  entries={agent.context.entries}
+                  totalTokens={agent.context.totalTokens}
+                  budgetTokens={agent.context.budgetTokens}
+                  onClose={() => setShowContext(false)}
+                />
+              ) : (
+                <ChatView
+                  messages={agent.messages}
+                  isStreaming={agent.isStreaming}
+                />
+              )}
+            </div>
+            {!showContext && (
+              <PromptInput
+                disabled={agent.isStreaming}
+                onSubmit={(v) => agent.send(v)}
+                onAbort={agent.abort}
                 isStreaming={agent.isStreaming}
               />
             )}
-          </div>
-          {!showContext && (
-            <PromptInput
-              disabled={agent.isStreaming}
-              onSubmit={(v) => agent.send(v)}
-              onAbort={agent.abort}
+            <StatusBar
+              model={agent.status.model}
+              cwd={agent.status.cwd ?? currentCwd}
+              usedTokens={agent.context.totalTokens}
+              budgetTokens={agent.context.budgetTokens}
               isStreaming={agent.isStreaming}
+              showContext={showContext}
+              onToggleContext={() => setShowContext((v) => !v)}
             />
-          )}
-          <StatusBar
-            model={agent.status.model}
-            cwd={agent.status.cwd ?? currentCwd}
-            usedTokens={agent.context.totalTokens}
-            budgetTokens={agent.context.budgetTokens}
-            isStreaming={agent.isStreaming}
-            showContext={showContext}
-            onToggleContext={() => setShowContext((v) => !v)}
-          />
-        </main>
-      </div>
+          </main>
+        </div>
+      </TransportContext.Provider>
     </ErrorBoundary>
   );
 }
