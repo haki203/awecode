@@ -24,6 +24,7 @@ vi.mock('@awecode/llm', () => ({
 const mockStreamText = vi.fn();
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => mockStreamText(...args),
+  jsonSchema: (schema: unknown) => schema,
 }));
 
 const mockConfig: AwecodeConfig = {

@@ -26,6 +26,9 @@ vi.mock('@awecode/llm', () => ({
 const mockStreamText = vi.fn();
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => mockStreamText(...args),
+  // Identity wrapper so buildToolSet's jsonSchema() call returns the
+  // raw schema unchanged — tests don't assert on tool schema shape.
+  jsonSchema: (schema: unknown) => schema,
 }));
 
 const mockConfig: AwecodeConfig = {

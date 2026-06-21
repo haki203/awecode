@@ -15,37 +15,51 @@
 import { describe, it, expect, vi } from 'vitest';
 import { chatTestCommand } from '../src/commands/chat-test.js';
 
+// chat-test now uses streamChat (not chat) because some OpenAI-compatible
+// servers return SSE chunks even when stream:false is requested.
 vi.mock('@awecode/llm', () => ({
   getDefaultConfigPath: vi.fn().mockReturnValue('/mock/config/path.yaml'),
   loadConfig: vi.fn().mockResolvedValue({
     activeProvider: 'mock',
     providers: { mock: { type: 'ollama', defaultModel: 'llama3' } },
   }),
-  chat: vi.fn().mockResolvedValue({
-    text: 'Hello from mock LLM',
-    usage: { promptTokens: 5, completionTokens: 5, totalTokens: 10 },
+  streamChat: vi.fn(async function* () {
+    yield 'Hello';
+    yield ' from';
+    yield ' mock';
+    yield ' LLM';
   }),
 }));
 
 describe('chatTestCommand', () => {
-  it('sends hello and prints response', async () => {
+  it('streams hello and prints response', async () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await chatTestCommand();
-    expect(consoleLog).toHaveBeenCalledWith(expect.stringContaining('Hello from mock LLM'));
+    // The streamed text is written via process.stdout.write, not console.log.
+    const chunks = stdoutWrite.mock.calls.map((c) => String(c[0])).join('');
+    expect(chunks).toContain('Hello from mock LLM');
     consoleLog.mockRestore();
+    stdoutWrite.mockRestore();
   });
 
-  it('announces the active provider before calling chat', async () => {
+  it('announces the active provider before streaming', async () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await chatTestCommand();
-    expect(consoleLog).toHaveBeenCalledWith(expect.stringContaining('Sending "Hello" to mock...'));
+    expect(consoleLog).toHaveBeenCalledWith(
+      expect.stringContaining('Sending "Hello" to mock...'),
+    );
     consoleLog.mockRestore();
+    stdoutWrite.mockRestore();
   });
 
-  it('prints total token usage', async () => {
+  it('prints success marker at end', async () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await chatTestCommand();
-    expect(consoleLog).toHaveBeenCalledWith(expect.stringContaining('tokens: 10'));
+    expect(consoleLog).toHaveBeenCalledWith(expect.stringContaining('OK'));
     consoleLog.mockRestore();
+    stdoutWrite.mockRestore();
   });
 });

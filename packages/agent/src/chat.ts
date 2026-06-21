@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { streamText, type ModelMessage, type ToolSet } from 'ai';
+import { streamText, jsonSchema, type ModelMessage, type ToolSet } from 'ai';
 import { createProvider } from '@awecode/llm';
 import type { AwecodeConfig } from '@awecode/llm';
 import { listToolDefinitions, dispatchTool } from '@awecode/tools';
@@ -72,6 +72,14 @@ Use the read_file, search_files, list_files, and shell_exec tools to explore the
  * pass concrete `ToolDefinition` objects and get back a typed `ToolSet`, so the
  * registry never sees `any` (mirrors the `adaptToolHandler` pattern from
  * `@awecode/tools`).
+ *
+ * Since AI SDK v6, raw JSON Schema objects passed to `inputSchema` are no
+ * longer accepted directly — they must be wrapped with the `jsonSchema()`
+ * helper from the `ai` package. Without the wrapper, the SDK's internal
+ * `asSchema()` tries to call `.schema()` on the plain object and fails with
+ * `TypeError: schema is not a function`. See:
+ *   https://ai-sdk.dev/docs/reference/ai-sdk-core/json-schema
+ *   https://github.com/vercel/ai/issues/13460
  */
 function buildToolSet(
   defs: ReturnType<typeof listToolDefinitions>,
@@ -80,7 +88,7 @@ function buildToolSet(
   for (const def of defs) {
     acc[def.name] = {
       description: def.description,
-      inputSchema: def.parameters,
+      inputSchema: jsonSchema(def.parameters),
     };
   }
   return acc as ToolSet;

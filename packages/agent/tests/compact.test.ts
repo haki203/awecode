@@ -8,6 +8,7 @@ vi.mock('ai', () => ({
     text: '## Summary\n\nTask: fix bug\nDecisions: use approach X',
     usage: { promptTokens: 100, completionTokens: 30 },
   }),
+  jsonSchema: (schema: unknown) => schema,
 }));
 
 vi.mock('@awecode/llm', () => ({
