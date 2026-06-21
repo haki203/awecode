@@ -780,3 +780,34 @@ button:disabled {
   color: var(--c-accent);
   border-color: var(--c-accent);
 }
+
+/* ===== Error boundary ===== */
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+  padding: 20px;
+  color: var(--c-danger);
+  gap: 8px;
+}
+.error-boundary h1 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--c-danger);
+}
+.error-boundary p {
+  margin: 0;
+  color: var(--c-text-dim);
+  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  max-width: 600px;
+  word-break: break-word;
+}
+.error-boundary button {
+  margin-top: 12px;
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
