@@ -14,7 +14,14 @@
 
 import type { ModelMessage } from 'ai';
 import type { ContextManager, ApprovalQueue, ApprovalDecision } from '@awecode/agent';
-import type { SelfHealConfig, SelfHealEvent, Worktree, CommitStrategy } from '@awecode/harness';
+import type {
+  SelfHealConfig,
+  SelfHealEvent,
+  Worktree,
+  CommitStrategy,
+  RunCommandResult,
+} from '@awecode/harness';
+import type { ParsedDiffBlock } from './diff-interceptor.js';
 
 export type OrchestratorPhase =
   | 'idle'
@@ -44,6 +51,28 @@ export interface OrchestratorOptions {
   onApprovalRequest?: (req: { filePath: string }) => void;
   onApprovalDecision?: (decision: ApprovalDecision) => void;
   onPhaseChange?: (phase: OrchestratorPhase) => void;
+  /**
+   * Test/production injection seam for the command runner used inside the
+   * self-heal loop. When omitted, the real `runCommand` from `@awecode/harness`
+   * is used (spawns a subprocess in the worktree).
+   */
+  runCommandOverride?: (
+    wt: Worktree,
+    cmd: string,
+    timeoutMs?: number,
+  ) => Promise<RunCommandResult>;
+  /**
+   * Test/production injection seam for the diff-apply step. When omitted, the
+   * orchestrator reads the target file, calls `applyDiff` from `@awecode/diff`,
+   * and writes the result back.
+   *
+   * Receives the already-parsed block (we do NOT re-parse the raw diff text
+   * that the self-heal loop forwards) and the absolute worktree root.
+   */
+  applyDiffOverride?: (
+    diff: ParsedDiffBlock,
+    worktreePath: string,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 export interface DiffCycleResult {
