@@ -688,7 +688,7 @@ button:disabled {
 }
 
 .md-pre {
-  margin: 8px 0;
+  margin: 0;
   padding: 10px 12px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -751,4 +751,32 @@ button:disabled {
   border: none;
   border-top: 1px solid var(--border);
   margin: 14px 0;
+}
+
+.md-pre-wrap {
+  position: relative;
+  margin: 8px 0;
+}
+
+.md-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 11px;
+  padding: 2px 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--c-text-dim);
+}
+
+.md-pre-wrap:hover .md-copy-btn {
+  opacity: 1;
+}
+
+.md-copy-btn:hover {
+  color: var(--c-accent);
+  border-color: var(--c-accent);
 }

@@ -12,8 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { useCallback, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+function PreWithCopy({ children }: { children?: ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = useCallback(() => {
+    const text = extractText(children);
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [children]);
+  return (
+    <div className="md-pre-wrap">
+      <button className="md-copy-btn" onClick={onCopy} aria-label="Copy code">
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <pre className="md-pre">{children}</pre>
+    </div>
+  );
+}
+
+function extractText(node: ReactNode): string {
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join('');
+  if (node && typeof node === 'object' && 'props' in node) {
+    // @ts-expect-error - duck typing React elements
+    return extractText(node.props.children);
+  }
+  return '';
+}
 
 interface Props {
   children: string;
@@ -68,7 +99,7 @@ export function Markdown({ children }: Props) {
               </code>
             );
           },
-          pre: ({ children }) => <pre className="md-pre">{children}</pre>,
+          pre: ({ children }) => <PreWithCopy>{children}</PreWithCopy>,
           blockquote: ({ children }) => (
             <blockquote className="md-blockquote">{children}</blockquote>
           ),
