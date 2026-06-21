@@ -22,7 +22,7 @@ interface Props {
 }
 
 const glyphs: Record<string, string> = {
-  file: '󰈙',
+  file: '📄',
   snippet: '✂',
   symbol: 'ƒ',
   'command-output': '▸',
