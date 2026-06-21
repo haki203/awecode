@@ -15,4 +15,7 @@
 export { detectTestCommand } from './test-detect.js';
 export type { DetectedTestCommand } from './test-detect.js';
 
+export { parseAssistantDiff } from './diff-interceptor.js';
+export type { ParsedDiffBlock } from './diff-interceptor.js';
+
 export const ORCHESTRATOR_PACKAGE_VERSION = '0.0.0';
