@@ -17,24 +17,19 @@ import { render, Box, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { randomUUID } from 'node:crypto';
 import { loadConfig, getDefaultConfigPath, type AwecodeConfig } from '@awecode/llm';
-import { parseDiff, applyDiff } from '@awecode/diff';
 import {
   ContextManager,
   ApprovalQueue,
   runChatLoop,
-  type ApprovalRequest,
-  type ApprovalDecision,
 } from '@awecode/agent';
 import { Orchestrator } from '@awecode/orchestrator';
 import type { ModelMessage } from 'ai';
 import { ChatView, type ChatMessage } from '../components/ChatView.js';
 import { ContextPanel } from '../components/ContextPanel.js';
-import { ApprovalView } from '../components/ApprovalView.js';
 import { WorkflowIndicator } from '../components/WorkflowIndicator.js';
 import { dispatchSlash, type SlashContext } from '../slash/index.js';
 import { registerWorkflowSlashCommands } from '../slash/workflow.js';
 import { registerCompactionSlashCommands } from '../slash/compaction.js';
-import { readFile, writeFile } from 'node:fs/promises';
 
 interface ChatAppProps {
   context: ContextManager;
@@ -49,20 +44,15 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // `inputKey` after each submit to remount the input, which clears its buffer.
   const [inputKey, setInputKey] = useState(0);
   const [isStreaming, setIsStreaming] = useState(false);
-  // Use a ref-backed ApprovalQueue so async callbacks (onDiffDetected) mutate the
-  // same instance the render loop reads. State-stored class instances don't
-  // trigger re-renders on method calls, and a fresh instance per render would
-  // drop enqueued diffs.
+  // Use a ref-backed ApprovalQueue for the Orchestrator's bookkeeping. The
+  // orchestrator's `ApprovalPrompter` (readline-based) drives the actual
+  // user prompts in v0.1; the queue is kept to dedupe re-emitted blocks
+  // across Diff Cycles within a single chat session.
   const queueRef = useRef<ApprovalQueue>(new ApprovalQueue());
-  const [currentApproval, setCurrentApproval] = useState<ApprovalRequest | null>(null);
-  const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
   // isStreaming lives in state for rendering, but handleSubmit's early-return
   // guard must read the freshest value to prevent double-submits racing the
   // setState flush. ref mirrors state for synchronous reads inside async paths.
   const streamingRef = useRef(false);
-  // Tracks whether an approval overlay is already open so onDiffDetected
-  // doesn't fight the post-stream pumpApproval.
-  const approvalOpenRef = useRef(false);
   // Guards the initialPrompt auto-submit against React StrictMode's
   // double-invoke of effects in development.
   const initialSubmitRef = useRef(false);
@@ -73,14 +63,17 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // Orchestrator instance (Plan 6). Lazily constructed on first
   // onDiffDetected so we don't pay init cost for chats that never emit a
   // diff. The orchestrator runs a full Diff Cycle (worktree → apply →
-  // self-heal → merge → commit) alongside the legacy TUI approval flow —
-  // unification is post-v0.1.
+  // self-heal → merge → commit) per LLM diff response and is the single
+  // source of truth for writing to disk — the legacy TUI approval overlay's
+  // direct-write path was removed in favor of this pipeline.
   const orchestratorRef = useRef<Orchestrator | null>(null);
-  // Backing array for the orchestrator's chatMessages option. The self-heal
-  // loop pushes feedback messages here on apply/test failures; a future task
-  // will thread this into runChatLoop's message history (Plan 6 wires the
-  // orchestrator side only).
-  const orchestratorMessagesRef = useRef<ModelMessage[]>([]);
+  // Live messages array shared between `runChatLoop` and the Orchestrator
+  // (Q7/A). Each `handleSubmit` resets the array with the fresh user turn
+  // and passes the same reference to both consumers. When the self-heal
+  // loop hits an apply/command failure, the orchestrator pushes a synthetic
+  // "user" feedback message here; the next `runChatLoop` iteration picks
+  // it up naturally and the LLM regenerates the diff.
+  const liveMessagesRef = useRef<ModelMessage[]>([]);
   // Intent Declaration: when the agent emits start_workflow(), we capture the
   // workflow name + phase to drive the WorkflowIndicator header. Cleared back
   // to null when the agent returns to Direct Mode.
@@ -99,17 +92,6 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
       exit();
     }
   });
-
-  // Promote the next queued diff (if any) into the approval overlay.
-  const pumpApproval = () => {
-    if (approvalOpenRef.current) return;
-    const next = queueRef.current.dequeue();
-    if (next) {
-      approvalOpenRef.current = true;
-      setCurrentBlockIdx(0);
-      setCurrentApproval(next);
-    }
-  };
 
   const handleSubmit = async (userInput: string) => {
     const trimmed = userInput.trim();
@@ -133,8 +115,13 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    // Seed the live messages array for this turn. runChatLoop and the
+    // Orchestrator share this same ref (Q7/A) so the orchestrator's
+    // self-heal feedback messages reach the LLM on the next iteration.
+    liveMessagesRef.current = [{ role: 'user', content: trimmed }];
+
     try {
-      await runChatLoop([{ role: 'user', content: trimmed }], {
+      await runChatLoop(liveMessagesRef.current, {
         config,
         context,
         abortSignal: abortController.signal,
@@ -154,18 +141,14 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
           setMessages((m) => [...m, { role: 'tool', content: `call ${name}` }]);
         },
         onDiffDetected: (diff) => {
-          // Existing TUI path (preserved for v0.1 backward compat):
-          // ApprovalQueue + ApprovalView still drive the interactive overlay.
-          const parsed = parseDiff(diff);
-          for (const p of parsed) {
-            queueRef.current.enqueue(p);
-          }
-
-          // New orchestrator path (Plan 6): run a full Diff Cycle in
-          // parallel. Console-only output for v0.1; TUI rendering is Plan
-          // 5b scope. Wrapped in a void IIFE because runChatLoop types
-          // this callback as (diff: string) => void (sync) — the fire-and-
-          // forget async work must not escape as a Promise.
+          // The Orchestrator is the single write path. It parses the diff,
+          // prompts for approval via readline, creates a worktree, applies
+          // the diff, runs self-heal, merges, commits, and cleans up.
+          // Console-only output for v0.1; a future task will surface the
+          // phase/approval state in the TUI.
+          // Wrapped in a void IIFE because runChatLoop types this callback
+          // as (diff: string) => void (sync) — the fire-and-forget async
+          // work must not escape as a floating Promise.
           void (async () => {
             try {
               if (!orchestratorRef.current) {
@@ -175,18 +158,15 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
                   approvalQueue: queueRef.current,
                   taskUuid: randomUUID(),
                   abortSignal: abortController.signal,
-                  chatMessages: orchestratorMessagesRef.current,
+                  chatMessages: liveMessagesRef.current,
                   onSelfHealEvent: (e) => {
                     console.log(`[self-heal] ${e.type}`);
                   },
                   onPhaseChange: (p) => {
                     console.log(`[orchestrator] phase: ${p}`);
                   },
-                  onApprovalDecision: (d) => {
-                    console.log(`[approval] ${d}`);
-                  },
                 });
-              }
+            }
 
               const result = await orchestratorRef.current.handleDiffDetected(diff);
               if (!result.success) {
@@ -230,8 +210,6 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
       streamingRef.current = false;
       setIsStreaming(false);
       abortControllerRef.current = null;
-      // After the stream completes, surface any pending diffs.
-      pumpApproval();
     }
   };
 
@@ -244,69 +222,6 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
     // handleSubmit closes over stable state setters; only initialPrompt
     // matters and it is available at mount. Empty deps are intentional.
   }, []);
-
-  const handleApproval = async (decision: ApprovalDecision) => {
-    if (!currentApproval) return;
-    const block = currentApproval.parsedDiff.blocks[currentBlockIdx];
-    if (!block) return;
-
-    if (decision === 'accept') {
-      try {
-        const source = await readFile(currentApproval.filePath, 'utf-8');
-        const applyResult = applyDiff(source, [block]);
-        if (applyResult.ok) {
-          await writeFile(currentApproval.filePath, applyResult.result, 'utf-8');
-          context.refreshFile(currentApproval.filePath, applyResult.result);
-        } else {
-          // Surface apply failure to the chat log so the user knows why their
-          // accepted diff didn't land.
-          setMessages((m) => [
-            ...m,
-            {
-              role: 'tool',
-              content: `apply failed (${applyResult.error}) on ${currentApproval.filePath}`,
-            },
-          ]);
-        }
-      } catch (err) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: 'tool',
-            content: `apply threw: ${(err as Error).message}`,
-          },
-        ]);
-      }
-    }
-
-    // Advance to the next block within this diff, else the next queued diff,
-    // else close the overlay.
-    const nextIdx = currentBlockIdx + 1;
-    if (nextIdx < currentApproval.parsedDiff.blocks.length) {
-      setCurrentBlockIdx(nextIdx);
-      return;
-    }
-    const next = queueRef.current.dequeue();
-    if (next) {
-      setCurrentBlockIdx(0);
-      setCurrentApproval(next);
-    } else {
-      approvalOpenRef.current = false;
-      setCurrentApproval(null);
-      setCurrentBlockIdx(0);
-    }
-  };
-
-  // Approval Mode overlay takes over rendering while a diff is pending.
-  if (currentApproval) {
-    return (
-      <ApprovalView
-        request={currentApproval}
-        blockIndex={currentBlockIdx}
-        onDecision={handleApproval}
-      />
-    );
-  }
 
   // Normal 2-panel Direct Mode layout: context sidebar + chat/transcript.
   return (
