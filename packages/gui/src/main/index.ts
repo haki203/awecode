@@ -19,13 +19,12 @@ import { dirname, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { applyEvent } from '@awecode/agent';
 import type { GuiAgentEvent, GuiClientCommand } from '../shared/protocol.js';
 import {
   type Session,
   type SessionMeta,
-  type SessionMessage,
   DEFAULT_TITLE,
-  deriveTitle,
   deleteSession as storeDeleteSession,
   listSessionsInWorkspace,
   loadSession,
@@ -115,8 +114,6 @@ class AgentBridge {
    * renderer uses to address the session.
    */
   private session: Session | null = null;
-  /** Last assistant message we're streaming tokens into, for coalescing. */
-  private pendingAssistant: SessionMessage | null = null;
   /**
    * Workspace the agent currently operates in. Read from the workspace
    * store at startup, mutated when the user picks a different folder.
@@ -213,70 +210,13 @@ class AgentBridge {
   }
 
   /**
-   * Fold an event into the bound session and persist. Cheap and good enough
-   * for v0.1 — we re-serialize the whole session JSON on every write. Chat
-   * transcripts stay small (a few hundred KB at worst), so this is fine.
+   * Fold an event into the bound session and persist. Delegates to the
+   * shared pure function so Desktop and Web share identical semantics.
+   * See ADR-0007.
    */
   private handle(ev: GuiAgentEvent): void {
     if (!this.session) return;
-    const now = Date.now();
-    switch (ev.type) {
-      case 'ready':
-        this.session.cwd = ev.cwd;
-        if (ev.model) this.session.model = ev.model;
-        if (ev.provider) this.session.provider = ev.provider;
-        break;
-      case 'message': {
-        const msg: SessionMessage = {
-          role: ev.role === 'tool' ? 'tool' : ev.role,
-          content: ev.content,
-          ts: now,
-        };
-        this.session.messages.push(msg);
-        // Promote "New chat" to a real title only on the first user turn.
-        // Keep user-renamed titles intact.
-        if (
-          ev.role === 'user' &&
-          this.session.title === DEFAULT_TITLE
-        ) {
-          this.session.title = deriveTitle(this.session.messages);
-        }
-        this.pendingAssistant = null;
-        break;
-      }
-      case 'token': {
-        if (!this.pendingAssistant) {
-          this.pendingAssistant = { role: 'assistant', content: '', ts: now };
-          this.session.messages.push(this.pendingAssistant);
-        }
-        this.pendingAssistant.content += ev.chunk;
-        break;
-      }
-      case 'tool_call': {
-        this.session.messages.push({
-          role: 'tool',
-          content: `call ${ev.name}`,
-          ts: now,
-        });
-        this.pendingAssistant = null;
-        break;
-      }
-      case 'done':
-        this.pendingAssistant = null;
-        break;
-      case 'error':
-        this.session.messages.push({
-          role: 'error',
-          content: ev.message,
-          ts: now,
-        });
-        this.pendingAssistant = null;
-        break;
-      default:
-        // intent / context_snapshot / diff_detected — no persistence change.
-        break;
-    }
-    this.session.updatedAt = now;
+    applyEvent(this.session, ev);
     saveSession(this.session);
   }
 
@@ -329,7 +269,6 @@ class AgentBridge {
     }
     this.child?.kill('SIGTERM');
     this.child = null;
-    this.pendingAssistant = null;
   }
 }
 
