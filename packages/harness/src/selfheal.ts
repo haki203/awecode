@@ -26,6 +26,7 @@ export const DEFAULT_SELF_HEAL_CONFIG: SelfHealConfig = {
 export interface SelfHealCallbacks {
   onEvent: (e: SelfHealEvent) => void;
   onCommandFailed: (stderr: string, lastDiff: string) => Promise<string>;
+  onDiffApplyFailed: (error: string, lastDiff: string) => Promise<string>;
   applyDiff: (
     diff: string,
     worktreePath: string,
@@ -43,29 +44,50 @@ export async function runSelfHealLoop(
   config: SelfHealConfig,
   callbacks: SelfHealCallbacks,
   runCmd: RunCommandFn,
+  abortSignal?: AbortSignal,
 ): Promise<{ success: boolean; finalStderr?: string; stepsUsed: number }> {
   let currentDiff = initialDiff;
   let lastStderr = '';
   let consecutiveSame = 0;
+  let diffFailStreak = 0;
   const startTime = Date.now();
 
   for (let step = 1; step <= config.maxSteps; step++) {
     callbacks.onEvent({ type: 'step_start', step });
 
-    // Check total timeout
     if (Date.now() - startTime > config.totalTimeout) {
       callbacks.onEvent({ type: 'step_cap_reached' });
       return { success: false, finalStderr: lastStderr, stepsUsed: step - 1 };
     }
 
-    // Apply diff
+    if (abortSignal?.aborted) {
+      callbacks.onEvent({ type: 'user_takeover', reason: 'Aborted by user' });
+      return { success: false, finalStderr: lastStderr, stepsUsed: step - 1 };
+    }
+
     const applyRes = await callbacks.applyDiff(currentDiff, worktree.path);
     if (!applyRes.ok) {
-      return { success: false, finalStderr: applyRes.error, stepsUsed: step };
+      diffFailStreak++;
+      callbacks.onEvent({
+        type: 'diff_fail_streak_reached',
+        count: diffFailStreak,
+        lastError: applyRes.error,
+      });
+
+      if (diffFailStreak >= config.diffFailStreak) {
+        return {
+          success: false,
+          finalStderr: `Diff apply failed ${diffFailStreak} times (streak cap). Last: ${applyRes.error}`,
+          stepsUsed: step,
+        };
+      }
+
+      currentDiff = await callbacks.onDiffApplyFailed(applyRes.error, currentDiff);
+      continue;
     }
     callbacks.onEvent({ type: 'diff_applied', filePath: worktree.path });
+    diffFailStreak = 0;
 
-    // Run command
     callbacks.onEvent({ type: 'command_start', command: testCommand });
     const result = await runCmd(worktree, testCommand, config.commandTimeout);
     callbacks.onEvent({
@@ -80,7 +102,6 @@ export async function runSelfHealLoop(
       return { success: true, stepsUsed: step };
     }
 
-    // Track consecutive same error
     if (result.stderr === lastStderr) {
       consecutiveSame++;
       callbacks.onEvent({ type: 'consecutive_same_error', count: consecutiveSame });
@@ -96,7 +117,6 @@ export async function runSelfHealLoop(
     }
     lastStderr = result.stderr;
 
-    // Ask for new diff
     currentDiff = await callbacks.onCommandFailed(result.stderr, currentDiff);
   }
 

@@ -22,6 +22,10 @@ function makeCallbacks(opts: {
       const diff = opts.newDiffs?.[diffIdx++] ?? 'fallback diff';
       return diff;
     }),
+    onDiffApplyFailed: vi.fn(async () => {
+      const diff = opts.newDiffs?.[diffIdx++] ?? 'fallback diff after apply fail';
+      return diff;
+    }),
     applyDiff: vi.fn(async () => {
       const r = opts.applyResults?.[applyIdx++] ?? { ok: true as const };
       return r;
@@ -145,11 +149,15 @@ describe('runSelfHealLoop', () => {
     expect(result.stepsUsed).toBeLessThan(10);
   }, 10_000);
 
-  it('returns applyDiff error on first failure', async () => {
+  it('returns applyDiff error after diffFailStreak cap reached', async () => {
     const events: SelfHealEvent[] = [];
     const cbs = makeCallbacks({
       events,
-      applyResults: [{ ok: false, error: 'no_match' }],
+      applyResults: [
+        { ok: false, error: 'no_match' },
+        { ok: false, error: 'no_match' },
+        { ok: false, error: 'no_match' },
+      ],
     });
 
     const result = await runSelfHealLoop(
@@ -162,6 +170,58 @@ describe('runSelfHealLoop', () => {
     );
 
     expect(result.success).toBe(false);
+    expect(result.finalStderr).toContain('streak cap');
     expect(result.finalStderr).toContain('no_match');
+    const streakEvents = events.filter((e) => e.type === 'diff_fail_streak_reached');
+    expect(streakEvents).toHaveLength(3);
+    expect(cbs.onDiffApplyFailed).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries diff on apply failure until success', async () => {
+    const events: SelfHealEvent[] = [];
+    const cbs = makeCallbacks({
+      events,
+      applyResults: [
+        { ok: false, error: 'no_match' },
+        { ok: false, error: 'no_match' },
+        { ok: true },
+      ],
+    });
+
+    const result = await runSelfHealLoop(
+      mockWt,
+      'bad diff',
+      'cmd',
+      DEFAULT_SELF_HEAL_CONFIG,
+      cbs,
+      async () => ({ exitCode: 0, stdout: 'pass', stderr: '' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.stepsUsed).toBe(3);
+    expect(cbs.onDiffApplyFailed).toHaveBeenCalledTimes(2);
+    const streakEvents = events.filter((e) => e.type === 'diff_fail_streak_reached');
+    expect(streakEvents).toHaveLength(2);
+  });
+
+  it('aborts when abortSignal already aborted', async () => {
+    const events: SelfHealEvent[] = [];
+    const cbs = makeCallbacks({ events });
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await runSelfHealLoop(
+      mockWt,
+      'diff',
+      'cmd',
+      DEFAULT_SELF_HEAL_CONFIG,
+      cbs,
+      async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+      controller.signal,
+    );
+
+    expect(result.success).toBe(false);
+    expect(events.some((e) => e.type === 'user_takeover')).toBe(true);
+    expect(result.stepsUsed).toBe(0);
   });
 });

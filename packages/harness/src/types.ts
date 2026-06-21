@@ -42,6 +42,7 @@ export type SelfHealEvent =
   | { type: 'command_done'; exitCode: number; stdout: string; stderr: string }
   | { type: 'diff_applied'; filePath: string }
   | { type: 'consecutive_same_error'; count: number }
+  | { type: 'diff_fail_streak_reached'; count: number; lastError: string }
   | { type: 'step_cap_reached' }
   | { type: 'user_takeover'; reason: string }
   | { type: 'success' };
