@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -24,18 +23,8 @@ import {
   resolveProviderContextWindow,
   type AwecodeConfig,
 } from '@awecode/llm';
-import {
-  ContextManager,
-  ApprovalQueue,
-  runChatLoop,
-} from '@awecode/agent';
-import { Orchestrator } from '@awecode/orchestrator';
-import type { ModelMessage } from 'ai';
-import type {
-  GuiAgentEvent,
-  GuiClientCommand,
-  ContextEntrySnapshot,
-} from '@awecode/gui/shared/protocol';
+import { ContextManager, createProtocolSession } from '@awecode/agent';
+import type { GuiClientCommand } from '@awecode/gui/shared/protocol';
 
 /**
  * `awecode open gui` launches the Electron desktop app.
@@ -161,41 +150,19 @@ function resolveGuiMain(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Internal mode: NDJSON protocol server
+// Internal mode: NDJSON protocol server (thin stdio transport over
+// ProtocolSession — see @awecode/agent/src/protocol-session.ts)
 // ---------------------------------------------------------------------------
-
-function writeEvent(ev: GuiAgentEvent): void {
-  process.stdout.write(JSON.stringify(ev) + '\n');
-}
-
-function snapshotContext(ctx: ContextManager): {
-  entries: ContextEntrySnapshot[];
-  totalTokens: number;
-  budgetTokens: number;
-} {
-  const entries = ctx.snapshot().map((e) => ({
-    type: e.type,
-    label:
-      e.path ??
-      (e.lines ? `${e.type}:${e.lines.start}-${e.lines.end}` : e.type),
-    tokens: e.tokens,
-  }));
-  return {
-    entries,
-    totalTokens: ctx.totalTokens,
-    budgetTokens: ctx.budgetTokens,
-  };
-}
 
 async function runInternalProtocolServer(): Promise<void> {
   const configPath = process.env.AWECODE_CONFIG_PATH ?? getDefaultConfigPath();
   const loaded = await loadConfig(configPath);
   if (!loaded) {
-    writeEvent({
+    process.stdout.write(JSON.stringify({
       type: 'error',
       message: `No config found at ${configPath}. Run 'awecode config' first.`,
-    });
-    writeEvent({ type: 'done' });
+    }) + '\n');
+    process.stdout.write(JSON.stringify({ type: 'done' }) + '\n');
     return;
   }
   const config: AwecodeConfig = loaded;
@@ -204,122 +171,38 @@ async function runInternalProtocolServer(): Promise<void> {
     activeProviderCfg !== undefined
       ? new ContextManager(resolveProviderContextWindow(activeProviderCfg))
       : new ContextManager();
-  const queueRef = { current: new ApprovalQueue() };
-  const liveMessagesRef = { current: [] as ModelMessage[] };
-  let orchestrator: Orchestrator | null = null;
-  let abortController: AbortController | null = null;
 
-  const activeModel =
-    config.providers[config.activeProvider]?.defaultModel;
-
-  writeEvent({
-    type: 'ready',
+  const session = createProtocolSession({
+    config,
+    context,
     cwd: process.cwd(),
-    model: activeModel,
-    provider: config.activeProvider,
+    send: (ev) => process.stdout.write(JSON.stringify(ev) + '\n'),
   });
-  const snap0 = snapshotContext(context);
-  writeEvent({ type: 'context_snapshot', ...snap0 });
 
   const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
-
   rl.on('line', (line) => {
     if (!line.trim()) return;
     let cmd: GuiClientCommand;
     try {
       cmd = JSON.parse(line) as GuiClientCommand;
     } catch {
-      writeEvent({ type: 'error', message: 'invalid JSON on stdin' });
+      process.stdout.write(JSON.stringify({
+        type: 'error',
+        message: 'invalid JSON on stdin',
+      }) + '\n');
       return;
     }
     if (cmd.type === 'exit') {
-      abortController?.abort();
-      writeEvent({ type: 'done' });
+      session.dispose();
       process.exit(0);
       return;
     }
     if (cmd.type === 'abort') {
-      abortController?.abort();
+      session.abort();
       return;
     }
     if (cmd.type === 'prompt') {
-      void handlePrompt(cmd.text);
+      void session.handlePrompt(cmd.text);
     }
   });
-
-  async function handlePrompt(text: string): Promise<void> {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    writeEvent({ type: 'message', role: 'user', content: trimmed });
-
-    liveMessagesRef.current = [{ role: 'user', content: trimmed }];
-    abortController = new AbortController();
-
-    try {
-      await runChatLoop(liveMessagesRef.current, {
-        config,
-        context,
-        abortSignal: abortController.signal,
-        onToken: (chunk) => writeEvent({ type: 'token', chunk }),
-        onToolCall: (name) => writeEvent({ type: 'tool_call', name }),
-        onDiffDetected: (diff) => {
-          void (async () => {
-            try {
-              if (!orchestrator) {
-                orchestrator = new Orchestrator({
-                  projectRoot: process.cwd(),
-                  context,
-                  approvalQueue: queueRef.current,
-                  taskUuid: randomUUID(),
-                  abortSignal: abortController!.signal,
-                  chatMessages: liveMessagesRef.current,
-                });
-              }
-              const result = await orchestrator.handleDiffDetected(diff);
-              writeEvent({
-                type: 'message',
-                role: 'tool',
-                content: result.success
-                  ? `applied: ${result.mergedFiles.join(', ')}`
-                  : `failed: ${result.error ?? 'unknown'}`,
-              });
-              const snap = snapshotContext(context);
-              writeEvent({ type: 'context_snapshot', ...snap });
-            } catch (err) {
-              writeEvent({
-                type: 'error',
-                message: `[orchestrator] ${(err as Error).message}`,
-              });
-            }
-          })();
-        },
-        onIntentDeclared: (intent) => {
-          if (intent.type === 'workflow') {
-            writeEvent({
-              type: 'intent',
-              intent: 'workflow',
-              name: intent.name,
-            });
-          } else {
-            writeEvent({ type: 'intent', intent: 'direct', name: null });
-          }
-        },
-      });
-    } catch (err) {
-      const isAbort =
-        err instanceof Error &&
-        (err.name === 'AbortError' ||
-          (err as { code?: string }).code === 'ABORT_ERR');
-      writeEvent({
-        type: 'message',
-        role: 'assistant',
-        content: isAbort ? '[aborted]' : `[error] ${(err as Error).message}`,
-      });
-    } finally {
-      abortController = null;
-      const snap = snapshotContext(context);
-      writeEvent({ type: 'context_snapshot', ...snap });
-      writeEvent({ type: 'done' });
-    }
-  }
 }
