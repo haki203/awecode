@@ -180,6 +180,7 @@ __metadata:
     "@awecode/diff": "workspace:*"
     "@awecode/harness": "workspace:*"
     "@types/node": "npm:^26.0.0"
+    simple-git: "npm:^3.27.0"
     tsup: "npm:^8.5.1"
     typescript: "npm:^6.0.3"
     vitest: "npm:^4.1.9"

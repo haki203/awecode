@@ -21,4 +21,11 @@ export type { ParsedDiffBlock } from './diff-interceptor.js';
 export { ApprovalPrompter } from './approval.js';
 export type { ApprovalPrompterOptions } from './approval.js';
 
+export { Orchestrator } from './orchestrator.js';
+export type {
+  OrchestratorPhase,
+  OrchestratorOptions,
+  DiffCycleResult,
+} from './types.js';
+
 export const ORCHESTRATOR_PACKAGE_VERSION = '0.0.0';
