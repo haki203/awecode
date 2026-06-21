@@ -18,8 +18,8 @@ import type {
   GuiClientCommand,
   Session,
   SessionMeta,
-  WorkspaceState,
 } from '../shared/protocol.js';
+import type { WorkspaceState } from '../main/types.js';
 
 const api = {
   send: (cmd: GuiClientCommand): Promise<void> =>

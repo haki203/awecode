@@ -15,6 +15,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import type { WorkspaceState } from './types.js';
+
+export type { WorkspaceState };
 
 /**
  * Workspace (project) store for the GUI.
@@ -32,13 +35,6 @@ const WORKSPACES_FILE = resolve(
   process.env.AWECODE_WORKSPACES_FILE ??
     join(homedir(), '.awecode', 'workspaces.json'),
 );
-
-export interface WorkspaceState {
-  /** Absolute path of the currently-open project folder. */
-  current: string | null;
-  /** Recently-opened folders, most-recent first. */
-  recent: string[];
-}
 
 const DEFAULT: WorkspaceState = { current: null, recent: [] };
 

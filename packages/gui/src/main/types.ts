@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type {
-  GuiAgentEvent,
-  GuiClientCommand,
-  ContextEntrySnapshot,
-  SessionMessage,
-  SessionMeta,
-  Session,
-} from './shared/protocol.js';
+/**
+ * Desktop-only presentation types. These are NOT part of the wire protocol
+ * shared between Desktop and Web — they live in @awecode/gui/main, not in
+ * @awecode/gui/shared/protocol.
+ */
+
+export interface WorkspaceState {
+  /** Absolute path of the currently-open project folder. */
+  current: string | null;
+  /** Recently-opened folders, most-recent first. */
+  recent: string[];
+}

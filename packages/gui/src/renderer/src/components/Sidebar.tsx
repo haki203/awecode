@@ -13,10 +13,8 @@
 // limitations under the License.
 
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  SessionMeta,
-  WorkspaceState,
-} from '../../../shared/protocol.js';
+import type { SessionMeta } from '../../../shared/protocol.js';
+import type { WorkspaceState } from '../../../main/types.js';
 
 interface Props {
   activeId: string | null;

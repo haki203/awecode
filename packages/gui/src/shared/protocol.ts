@@ -70,12 +70,3 @@ export interface SessionMeta {
 export interface Session extends SessionMeta {
   messages: SessionMessage[];
 }
-
-// --- Workspace (project picker) -------------------------------------------
-
-export interface WorkspaceState {
-  /** Absolute path of the currently-open project folder. */
-  current: string | null;
-  /** Recently-opened folders, most-recent first. */
-  recent: string[];
-}

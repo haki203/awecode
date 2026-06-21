@@ -20,7 +20,7 @@ import { PromptInput } from './components/PromptInput.js';
 import { StatusBar } from './components/StatusBar.js';
 import { ContextPanel } from './components/ContextPanel.js';
 import { WorkflowIndicator } from './components/WorkflowIndicator.js';
-import type { WorkspaceState } from '../../shared/protocol.js';
+import type { WorkspaceState } from '../../main/types.js';
 
 export function App() {
   const agent = useAgent();

@@ -14,5 +14,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src/renderer/**/*", "src/shared/**/*"]
+  "include": [
+    "src/renderer/**/*",
+    "src/shared/**/*",
+    "src/main/types.ts"
+  ]
 }
