@@ -21,7 +21,14 @@ export interface ApprovalRequest {
   filePath: string;
 }
 
-export type ApprovalDecision = 'accept' | 'reject' | 'edit' | 'skip';
+export type ApprovalDecision =
+  | 'accept'
+  | 'reject'
+  | 'edit'
+  | 'skip'
+  | 'skip_all'
+  | 'accept_all'
+  | 'quit';
 
 export class ApprovalQueue {
   private queue: ApprovalRequest[] = [];

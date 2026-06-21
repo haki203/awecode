@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ApprovalQueue } from '../src/approval.js';
+import type { ApprovalDecision } from '../src/approval.js';
 import type { ParsedDiff } from '@awecode/diff';
 
 const mockDiff: ParsedDiff = {
@@ -82,5 +83,21 @@ describe('ApprovalQueue', () => {
       blocks: [{ search: 'other\n', replace: 'new\n' }],
     });
     expect(q.pending).toHaveLength(3);
+  });
+});
+
+describe('ApprovalDecision type', () => {
+  it('accepts 7 values: accept, reject, edit, skip, skip_all, accept_all, quit', () => {
+    const decisions: ApprovalDecision[] = [
+      'accept',
+      'reject',
+      'edit',
+      'skip',
+      'skip_all',
+      'accept_all',
+      'quit',
+    ];
+    expect(decisions).toHaveLength(7);
+    expect(new Set(decisions).size).toBe(7);
   });
 });
