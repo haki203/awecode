@@ -70,6 +70,20 @@ describe('ContextManager', () => {
     expect(cm.utilization).toBeLessThan(1);
   });
 
+  it('supports large budgets (e.g. 1M-token models like GLM-5.2)', () => {
+    const cm = new ContextManager(1_000_000);
+    expect(cm.budgetTokens).toBe(1_000_000);
+    // A few hundred tokens is well under 1% utilisation — this is the
+    // case the user-reported regression was about: small inputs on a
+    // 1M model showing a near-empty bar instead of a pegged 100k one.
+    cm.addFile({
+      path: '/repo/src/index.ts',
+      content: 'a'.repeat(500),
+      addedBy: 'user',
+    });
+    expect(cm.utilization).toBeLessThan(0.01);
+  });
+
   it('toMessages returns empty when no entries', () => {
     const cm = new ContextManager();
     expect(cm.toMessages()).toEqual([]);

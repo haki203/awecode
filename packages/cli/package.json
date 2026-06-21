@@ -16,6 +16,7 @@
   "dependencies": {
     "@awecode/agent": "workspace:*",
     "@awecode/diff": "workspace:*",
+    "@awecode/gui": "workspace:*",
     "@awecode/harness": "workspace:*",
     "@awecode/llm": "workspace:*",
     "@awecode/orchestrator": "workspace:*",

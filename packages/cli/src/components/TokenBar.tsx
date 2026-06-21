@@ -13,18 +13,23 @@
 // limitations under the License.
 
 import { Box, Text } from 'ink';
+import { colors } from '../theme.js';
 
 interface Props {
   used: number;
   budget: number;
 }
 
+/**
+ * Detailed token meter used inside the ContextOverlay. The always-on
+ * statusline uses ContextStatusline instead (much smaller).
+ */
 export function TokenBar({ used, budget }: Props) {
   const rawPct = budget > 0 ? Math.round((used / budget) * 100) : 0;
   // Clamp to [0, 100] so runaway used (> budget) doesn't break the bar
   const pct = Math.max(0, Math.min(100, rawPct));
   const level = pct >= 95 ? 'SEVERE' : pct >= 85 ? 'MODERATE' : 'OK';
-  const color = pct >= 95 ? 'red' : pct >= 85 ? 'yellow' : 'green';
+  const color = pct >= 95 ? colors.severe : pct >= 85 ? colors.moderate : colors.ok;
 
   const filled = Math.floor(pct / 5);
   const bar = '█'.repeat(Math.min(filled, 20)) + '░'.repeat(Math.max(0, 20 - filled));
@@ -32,8 +37,14 @@ export function TokenBar({ used, budget }: Props) {
   return (
     <Box flexDirection="column">
       <Text>
-        Context ({used.toLocaleString()} / {budget.toLocaleString()} tokens) — {pct}% —{' '}
-        <Text color={color} bold>{level}</Text>
+        <Text color={colors.muted}>Context</Text>
+        <Text color={colors.muted}> </Text>
+        <Text bold>{used.toLocaleString()}</Text>
+        <Text color={colors.muted}> / {budget.toLocaleString()} tokens</Text>
+        <Text color={colors.muted}> — {pct}% — </Text>
+        <Text color={color} bold>
+          {level}
+        </Text>
       </Text>
       <Text color={color}>{bar}</Text>
     </Box>

@@ -14,6 +14,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import type { ApprovalRequest, ApprovalDecision } from '@awecode/agent';
+import { colors } from '../theme.js';
 import { DiffPreview } from './DiffPreview.js';
 
 interface Props {
@@ -32,8 +33,14 @@ export function ApprovalView({ request, blockIndex, onDecision }: Props) {
   const block = request.parsedDiff.blocks[blockIndex];
 
   return (
-    <Box flexDirection="column" borderStyle="round" paddingX={1}>
-      <Text bold>Diff Approval — {request.filePath}</Text>
+    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderStrong} paddingX={1}>
+      <Box gap={1}>
+        <Text color={colors.accent} bold>
+          Diff Approval
+        </Text>
+        <Text color={colors.muted}>·</Text>
+        <Text bold>{request.filePath}</Text>
+      </Box>
       <Text> </Text>
       {block && (
         <DiffPreview
@@ -43,11 +50,26 @@ export function ApprovalView({ request, blockIndex, onDecision }: Props) {
         />
       )}
       <Text> </Text>
-      <Text>
-        <Text color="green">[y]</Text> accept{'  '}
-        <Text color="red">[n]</Text> reject{'  '}
-        <Text color="yellow">[s]</Text> skip
-      </Text>
+      <Box gap={2}>
+        <Box gap={1}>
+          <Text color={colors.agent} bold>
+            [y]
+          </Text>
+          <Text color={colors.muted}>accept</Text>
+        </Box>
+        <Box gap={1}>
+          <Text color={colors.danger} bold>
+            [n]
+          </Text>
+          <Text color={colors.muted}>reject</Text>
+        </Box>
+        <Box gap={1}>
+          <Text color={colors.warn} bold>
+            [s]
+          </Text>
+          <Text color={colors.muted}>skip</Text>
+        </Box>
+      </Box>
     </Box>
   );
 }

@@ -14,6 +14,7 @@
 
 import { Box, Text } from 'ink';
 import type { DiffBlock } from '@awecode/diff';
+import { colors } from '../theme.js';
 
 interface Props {
   block: DiffBlock;
@@ -46,16 +47,22 @@ export function DiffPreview({ block, blockIndex, totalBlocks, filePath }: Props)
 
   return (
     <Box flexDirection="column">
-      <Text bold>
-        Block {blockIndex + 1}/{totalBlocks}
-        <Text dimColor> ({lang})</Text>
+      <Box gap={1}>
+        <Text bold>
+          Block {blockIndex + 1}/{totalBlocks}
+        </Text>
+        <Text color={colors.muted}>({lang})</Text>
         {block.anchor && (
-          <Text dimColor> at: @{block.anchor.type} {block.anchor.symbol}</Text>
+          <Text color={colors.muted}>
+            @{block.anchor.type} {block.anchor.symbol}
+          </Text>
         )}
-      </Text>
+      </Box>
       <Box flexDirection="column" marginTop={1}>
-        <Text color="red">- {block.search.trim() || '(empty — insert)'}</Text>
-        <Text color="green">+ {block.replace.trim()}</Text>
+        <Text color={colors.danger}>
+          - {block.search.trim() || '(empty — insert)'}
+        </Text>
+        <Text color={colors.agent}>+ {block.replace.trim()}</Text>
       </Box>
     </Box>
   );

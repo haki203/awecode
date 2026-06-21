@@ -13,28 +13,26 @@
 // limitations under the License.
 
 import { Box, Text } from 'ink';
+import { TextInput } from '@inkjs/ui';
 import { colors } from '../theme.js';
 
 interface Props {
-  workflow: string | null;
-  phase: string | null;
+  onSubmit: (value: string) => void;
+  placeholder?: string;
 }
 
-export function WorkflowIndicator({ workflow, phase }: Props) {
-  if (!workflow) return null;
-
+/**
+ * Prompt input with a subtle prompt glyph, matching the Codex/OpenCode
+ * single-line footer aesthetic. Wraps `@inkjs/ui`'s uncontrolled TextInput
+ * (v2), so callers should still remount via `key` to clear the buffer.
+ */
+export function PromptInput({ onSubmit, placeholder }: Props) {
   return (
     <Box gap={1}>
-      <Text color={colors.accent}>⚡</Text>
       <Text color={colors.accent} bold>
-        {workflow}
+        ❯
       </Text>
-      {phase && (
-        <>
-          <Text color={colors.muted}>·</Text>
-          <Text color={colors.muted}>{phase}</Text>
-        </>
-      )}
+      <TextInput onSubmit={onSubmit} placeholder={placeholder ?? 'ask anything…'} />
     </Box>
   );
 }

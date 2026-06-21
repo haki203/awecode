@@ -14,6 +14,8 @@
 
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
+import { colors } from '../theme.js';
+import { Spinner } from './Spinner.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
@@ -26,36 +28,54 @@ interface Props {
   workflowIndicator?: ReactNode | null;
 }
 
+// Compact prefix glyphs (left column) instead of the verbose "You: " / "Agent: ".
+// Matches the aesthetic Codex/OpenCode use: single-line roles, color-coded.
+function renderMessage(msg: ChatMessage): ReactNode {
+  if (msg.role === 'user') {
+    return (
+      <Box gap={1}>
+        <Text color={colors.user} bold>
+          ❯
+        </Text>
+        <Text>{msg.content}</Text>
+      </Box>
+    );
+  }
+  if (msg.role === 'assistant') {
+    return (
+      <Box gap={1}>
+        <Text color={colors.agent} bold>
+          ●
+        </Text>
+        <Text>{msg.content}</Text>
+      </Box>
+    );
+  }
+  // tool — dim, single line, truncated hard so it never dominates
+  const summary = msg.content.length > 80 ? `${msg.content.slice(0, 77)}…` : msg.content;
+  return (
+    <Box gap={1}>
+      <Text color={colors.tool}>↳</Text>
+      <Text color={colors.tool}>{summary}</Text>
+    </Box>
+  );
+}
+
 export function ChatView({ messages, isStreaming, workflowIndicator }: Props) {
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" gap={0}>
       {workflowIndicator != null && (
         <Box marginBottom={1}>{workflowIndicator}</Box>
       )}
       {messages.map((msg, i) => (
-        <Box key={i} marginBottom={i < messages.length - 1 ? 1 : 0}>
-          {msg.role === 'user' && (
-            <Text>
-              <Text bold color="cyan">You: </Text>
-              {msg.content}
-            </Text>
-          )}
-          {msg.role === 'assistant' && (
-            <Text>
-              <Text bold color="green">Agent: </Text>
-              {msg.content}
-            </Text>
-          )}
-          {msg.role === 'tool' && (
-            <Text dimColor>[tool] {msg.content.slice(0, 200)}</Text>
-          )}
+        <Box
+          key={i}
+          marginBottom={i < messages.length - 1 || isStreaming ? 0 : 0}
+        >
+          {renderMessage(msg)}
         </Box>
       ))}
-      {isStreaming && (
-        <Text color="yellow">
-          <Text bold>●</Text> thinking...
-        </Text>
-      )}
+      {isStreaming && <Spinner label="thinking" />}
     </Box>
   );
 }

@@ -17,9 +17,15 @@
  * the provider SDK will be invoked with (e.g. `gpt-4o-mini`,
  * `claude-3-5-sonnet`, `llama3`). Can be overridden at runtime via the
  * `--model` CLI flag without rewriting the config file.
+ *
+ * `contextWindow` is an optional explicit override (in tokens) of the
+ * context budget the CLI should assume for this provider. When unset, the
+ * budget is resolved automatically from the model name via
+ * `resolveContextBudget` (see `context-window.ts`).
  */
 export interface BaseProviderConfig {
   defaultModel: string;
+  contextWindow?: number;
 }
 
 /**

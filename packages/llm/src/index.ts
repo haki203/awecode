@@ -34,5 +34,10 @@ export {
 export { createProvider } from './providers.js';
 export { chat, streamChat } from './chat.js';
 export type { ChatOptions, ChatResult } from './chat.js';
+export {
+  resolveContextBudget,
+  resolveProviderContextWindow,
+  DEFAULT_CONTEXT_WINDOW_FALLBACK,
+} from './context-window.js';
 
 export const LLM_PACKAGE_VERSION = '0.0.0';

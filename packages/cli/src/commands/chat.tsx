@@ -13,10 +13,14 @@
 // limitations under the License.
 
 import React, { useState, useRef, useEffect } from 'react';
-import { render, Box, useInput, useApp } from 'ink';
-import { TextInput } from '@inkjs/ui';
+import { render, Box, Text, useInput, useApp } from 'ink';
 import { randomUUID } from 'node:crypto';
-import { loadConfig, getDefaultConfigPath, type AwecodeConfig } from '@awecode/llm';
+import {
+  loadConfig,
+  getDefaultConfigPath,
+  resolveProviderContextWindow,
+  type AwecodeConfig,
+} from '@awecode/llm';
 import {
   ContextManager,
   ApprovalQueue,
@@ -25,8 +29,12 @@ import {
 import { Orchestrator } from '@awecode/orchestrator';
 import type { ModelMessage } from 'ai';
 import { ChatView, type ChatMessage } from '../components/ChatView.js';
-import { ContextPanel } from '../components/ContextPanel.js';
+import { ContextOverlay } from '../components/ContextOverlay.js';
+import { ContextStatusline } from '../components/ContextStatusline.js';
+import { PromptInput } from '../components/PromptInput.js';
+import { StatusBar } from '../components/StatusBar.js';
 import { WorkflowIndicator } from '../components/WorkflowIndicator.js';
+import { colors } from '../theme.js';
 import { dispatchSlash, type SlashContext } from '../slash/index.js';
 import { registerWorkflowSlashCommands } from '../slash/workflow.js';
 import { registerCompactionSlashCommands } from '../slash/compaction.js';
@@ -79,6 +87,11 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // to null when the agent returns to Direct Mode.
   const [workflow, setWorkflow] = useState<string | null>(null);
   const [phase, setPhase] = useState<string | null>(null);
+  // On-demand Context Overlay: hidden by default so the chat column owns the
+  // full width. Press `c` (when not streaming) to toggle the overlay; `Esc`
+  // or `c` again closes it. Inspired by Codex / OpenCode, which keep context
+  // as a small status hint and surface details only on request.
+  const [showContext, setShowContext] = useState(false);
   // Slash command context. projectRoot is resolved from cwd at render time;
   // userSkillsDir is left empty until config exposes a skills path.
   const slashCtx: SlashContext = {
@@ -86,10 +99,32 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
     userSkillsDir: '',
   };
 
+  // Global keybindings. Ctrl+C always exits (aborting any in-flight stream).
+  // `c` toggles the context overlay but only when the prompt input is empty
+  // and not streaming — otherwise the character should flow into the input.
+  // We can't peek at the TextInput's buffer (it's uncontrolled in @inkjs/ui
+  // v2), so we deliberately skip single-char handling when streaming and let
+  // users rely on the `/context` slash command during a stream instead.
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar.toLowerCase() === 'c') {
       abortControllerRef.current?.abort();
       exit();
+      return;
+    }
+    if (key.escape) {
+      setShowContext(false);
+      return;
+    }
+    if (
+      !key.ctrl &&
+      !key.meta &&
+      inputChar === 'c' &&
+      !streamingRef.current &&
+      showContext
+    ) {
+      // `c` closes the overlay (toggle). Opening via `c` is handled by the
+      // StatusBar hint to avoid hijacking printable chars while typing.
+      setShowContext(false);
     }
   });
 
@@ -223,33 +258,101 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
     // matters and it is available at mount. Empty deps are intentional.
   }, []);
 
-  // Normal 2-panel Direct Mode layout: context sidebar + chat/transcript.
+  // Codex / OpenCode-inspired single-column layout.
+  // The chat transcript owns the full width; context lives as a compact
+  // statusline at the bottom (always visible, 1 line) and a full-details
+  // overlay shown on demand via the StatusBar's keybinding hint.
+  // When `showContext` is true we replace the transcript area with the
+  // overlay (instead of stacking) so the overlay never competes with
+  // streaming output for vertical space.
+  const activeModel = config.providers[config.activeProvider]?.defaultModel;
+  const statusHint = showContext
+    ? 'esc close'
+    : isStreaming
+      ? 'ctrl+c abort'
+      : 'c context  ·  ctrl+c exit';
+
   return (
-    <Box flexDirection="row" height="100%">
-      <Box borderStyle="single" paddingX={1} width="40%">
-        <ContextPanel
-          entries={context.snapshot()}
-          totalTokens={context.totalTokens}
-          budget={context.budgetTokens}
-        />
+    <Box flexDirection="column" height="100%" paddingTop={0}>
+      {/* Main scroll area: either the chat transcript or the context overlay. */}
+      <Box flexGrow={1} flexDirection="column" paddingX={0}>
+        {showContext ? (
+          <Box
+            flexDirection="column"
+            borderStyle="round"
+            borderColor={colors.borderStrong}
+            paddingX={1}
+            height={14}
+          >
+            <Box marginBottom={1}>
+              <Text color={colors.accent} bold>
+                Context
+              </Text>
+              <Text color={colors.muted}> · press </Text>
+              <Text color={colors.borderStrong} bold>
+                c
+              </Text>
+              <Text color={colors.muted}> or </Text>
+              <Text color={colors.borderStrong} bold>
+                esc
+              </Text>
+              <Text color={colors.muted}> to close</Text>
+            </Box>
+            <ContextOverlay
+              entries={context.snapshot()}
+              totalTokens={context.totalTokens}
+              budget={context.budgetTokens}
+              maxHeight={11}
+            />
+          </Box>
+        ) : (
+          <ChatView
+            messages={messages}
+            isStreaming={isStreaming}
+            workflowIndicator={
+              workflow ? (
+                <WorkflowIndicator workflow={workflow} phase={phase} />
+              ) : null
+            }
+          />
+        )}
       </Box>
-      <Box flexDirection="column" paddingX={1} width="60%">
-        <ChatView
-          messages={messages}
-          isStreaming={isStreaming}
-          workflowIndicator={
-            workflow ? <WorkflowIndicator workflow={workflow} phase={phase} /> : null
+
+      {/* Spacer pushes prompt + statusbar to the bottom of the viewport. */}
+      <Box flexGrow={showContext ? 0 : 1} />
+
+      {/* Prompt input row. Hidden while streaming so the user can't queue
+          another turn — matches Codex's behavior. */}
+      {!isStreaming && !showContext && (
+        <Box paddingX={0}>
+          <PromptInput
+            key={inputKey}
+            onSubmit={(v) => {
+              // /context slash command opens the overlay as a convenience.
+              if (v.trim() === '/context' || v.trim() === '/ctx') {
+                setShowContext(true);
+                setInputKey((k) => k + 1);
+                return;
+              }
+              void handleSubmit(v);
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Always-visible statusline: brand · model · context meter · hint. */}
+      <Box paddingX={0}>
+        <StatusBar
+          model={activeModel}
+          hint={statusHint}
+          context={
+            <ContextStatusline
+              entries={context.snapshot()}
+              used={context.totalTokens}
+              budget={context.budgetTokens}
+            />
           }
         />
-        <Box marginTop={1}>
-          {!isStreaming && (
-            <TextInput
-              key={inputKey}
-              onSubmit={handleSubmit}
-              placeholder="Type your prompt (Ctrl+C to exit)"
-            />
-          )}
-        </Box>
       </Box>
     </Box>
   );
@@ -316,7 +419,11 @@ export async function chatCommand(
     console.log(`[awecode] using provider override: ${opts.provider}`);
   }
 
-  const context = new ContextManager();
+  const activeProviderCfg = config.providers[config.activeProvider];
+  const context =
+    activeProviderCfg !== undefined
+      ? new ContextManager(resolveProviderContextWindow(activeProviderCfg))
+      : new ContextManager();
 
   // Register slash commands (idempotent — registerSlashCommand replaces any
   // existing entry with the same name). Safe to call on every chat startup.

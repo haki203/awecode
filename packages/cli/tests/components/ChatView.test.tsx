@@ -30,8 +30,11 @@ describe('ChatView', () => {
       />,
     );
     const frame = lastFrame();
-    expect(frame).toContain('You: hello');
-    expect(frame).toContain('Agent: hi there');
+    // New Codex-style prefix glyphs (see ChatView.tsx): ❯ for user, ● for agent.
+    expect(frame).toContain('❯');
+    expect(frame).toContain('hello');
+    expect(frame).toContain('●');
+    expect(frame).toContain('hi there');
   });
 
   it('shows thinking indicator when streaming', () => {
@@ -39,30 +42,32 @@ describe('ChatView', () => {
     expect(lastFrame()).toContain('thinking');
   });
 
-  it('renders tool messages with the [tool] prefix', () => {
+  it('renders tool messages with the ↳ glyph and dim color', () => {
     const { lastFrame } = render(
       <ChatView messages={[{ role: 'tool', content: 'ran lint' }]} isStreaming={false} />,
     );
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('[tool]');
+    expect(frame).toContain('↳');
     expect(frame).toContain('ran lint');
   });
 
-  it('truncates tool messages longer than 200 chars', () => {
-    // Use newlines so each segment stays under ink's wrap width and the
-    // trailing content (chars 201+) never appears in the rendered frame.
-    const chunk = 'abcdefgh'.repeat(10); // 80 chars per line, < 80-col wrap
-    const long = [chunk, chunk, chunk, chunk].join('\n'); // 4 * 80 = 320 chars
+  it('truncates tool messages longer than 80 chars', () => {
+    // New ChatView truncates tool messages to 80 chars (down from 200) to keep
+    // the transcript scannable — matches Codex/OpenCode density. Use a single
+    // long line; truncation kicks in regardless of newlines.
+    const chunk = 'abcdefgh'.repeat(10); // 80 chars
+    const long = `${chunk}${chunk}${chunk}${chunk}`; // 320 chars, no newlines
     const { lastFrame } = render(
       <ChatView messages={[{ role: 'tool', content: long }]} isStreaming={false} />,
     );
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('[tool]');
-    // First three 80-char chunks are within the first 200 chars → present.
-    expect(frame).toContain(chunk);
-    // The 4th chunk starts at char offset 240 (3*80 + 3 newlines = 243) →
-    // beyond the 200-char truncation, must NOT appear.
-    expect(frame.split(chunk).length).toBeLessThanOrEqual(4);
+    expect(frame).toContain('↳');
+    // The full first 80-char chunk is within the 77-char truncation budget
+    // (with the trailing …), so part of it must appear.
+    expect(frame).toContain('abcdefgh');
+    // The 4th chunk (chars 240-319) must NOT appear.
+    // Sanity: count occurrences — original repeats chunk 4x, truncated ≤ 1x.
+    expect(frame.split(chunk).length).toBeLessThanOrEqual(2);
   });
 
   it('shows workflow indicator when provided', () => {

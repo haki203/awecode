@@ -12,29 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Box, Text } from 'ink';
-import { colors } from '../theme.js';
-
-interface Props {
-  workflow: string | null;
-  phase: string | null;
-}
-
-export function WorkflowIndicator({ workflow, phase }: Props) {
-  if (!workflow) return null;
-
-  return (
-    <Box gap={1}>
-      <Text color={colors.accent}>⚡</Text>
-      <Text color={colors.accent} bold>
-        {workflow}
-      </Text>
-      {phase && (
-        <>
-          <Text color={colors.muted}>·</Text>
-          <Text color={colors.muted}>{phase}</Text>
-        </>
-      )}
-    </Box>
-  );
-}
+export type {
+  GuiAgentEvent,
+  GuiClientCommand,
+  ContextEntrySnapshot,
+  SessionMessage,
+  SessionMeta,
+  Session,
+  WorkspaceState,
+} from './shared/protocol.js';
