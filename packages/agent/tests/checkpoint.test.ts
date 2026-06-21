@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { saveCheckpoint, loadCheckpoint, listCheckpoints } from '../src/context/checkpoint.js';
+import { saveCheckpoint, loadCheckpoint, listCheckpoints } from '../src/persistence/checkpoint.js';
 import type { ContextEntry } from '../src/context/entry.js';
 
 let tmpProject: string;

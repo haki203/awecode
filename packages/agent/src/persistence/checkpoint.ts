@@ -14,7 +14,7 @@
 
 import { writeFile, readFile, mkdir, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import type { ContextEntry } from './entry.js';
+import type { ContextEntry } from '../context/entry.js';
 
 export interface Checkpoint {
   timestamp: string;

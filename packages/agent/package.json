@@ -13,6 +13,10 @@
     "./persistence/sessions": {
       "types": "./src/persistence/sessions.ts",
       "import": "./src/persistence/sessions.ts"
+    },
+    "./persistence/checkpoint": {
+      "types": "./src/persistence/checkpoint.ts",
+      "import": "./src/persistence/checkpoint.ts"
     }
   },
   "scripts": {
