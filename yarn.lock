@@ -172,6 +172,20 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@awecode/orchestrator@workspace:packages/orchestrator":
+  version: 0.0.0-use.local
+  resolution: "@awecode/orchestrator@workspace:packages/orchestrator"
+  dependencies:
+    "@awecode/agent": "workspace:*"
+    "@awecode/diff": "workspace:*"
+    "@awecode/harness": "workspace:*"
+    "@types/node": "npm:^26.0.0"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^6.0.3"
+    vitest: "npm:^4.1.9"
+  languageName: unknown
+  linkType: soft
+
 "@awecode/repomap@workspace:packages/repomap":
   version: 0.0.0-use.local
   resolution: "@awecode/repomap@workspace:packages/repomap"
