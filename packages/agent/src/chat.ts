@@ -116,7 +116,7 @@ function normalizeToolCall(call: {
 }
 
 export async function runChatLoop(
-  initialMessages: ModelMessage[],
+  messages: ModelMessage[],
   opts: ChatLoopOptions,
 ): Promise<ModelMessage[]> {
   const providerConfig = opts.config.providers[opts.config.activeProvider];
@@ -127,15 +127,23 @@ export async function runChatLoop(
   }
   const model = createProvider(providerConfig);
 
-  const messages: ModelMessage[] = [
-    ...initialMessages,
-    ...opts.context.toMessages(),
-  ];
-  const tools = buildToolSet(listToolDefinitions());
+  // Seed the shared array with context entries (idempotent — caller may
+  // pre-seed). We DON'T copy `messages` — it IS the live ref the caller owns,
+  // so any external injection (e.g. from the Orchestrator) naturally appears
+  // in the next iteration.
+  const contextMessages = opts.context.toMessages();
+  for (const m of contextMessages) {
+    if (!messages.some((existing) => existing === m)) {
+      messages.push(m);
+    }
+  }
 
+  const tools = buildToolSet(listToolDefinitions());
   const maxIter = opts.maxIterations ?? 20;
 
   for (let iter = 0; iter < maxIter; iter++) {
+    if (opts.abortSignal?.aborted) break;
+
     // NOTE: real AI SDK v6 `streamText` returns a `StreamTextResult` directly
     // (not a Promise). The brief's test mock, however, uses
     // `mockResolvedValueOnce`, so the call yields a Promise. Awaiting a
