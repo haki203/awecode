@@ -117,4 +117,21 @@ describe('runChatLoop', () => {
     expect(toolCalls[0]!.name).toBe('read_file');
     expect(toolResults).toHaveLength(1);
   });
+
+  it('calls onDone exactly once when the loop finishes', async () => {
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Hello!'));
+
+    const ctx = new ContextManager();
+    const doneSpy = vi.fn();
+    await runChatLoop(
+      [{ role: 'user', content: 'hi' }],
+      {
+        config: mockConfig,
+        context: ctx,
+        onDone: doneSpy,
+      },
+    );
+
+    expect(doneSpy).toHaveBeenCalledTimes(1);
+  });
 });

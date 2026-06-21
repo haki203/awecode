@@ -38,6 +38,8 @@ export interface ChatLoopOptions {
   onToolResult?: (name: string, result: unknown) => void;
   onDiffDetected?: (diff: string) => void;
   onIntentDeclared?: (intent: IntentDeclaration) => void;
+  /** Called exactly once when the loop exits (normally, via abort, or via throw). */
+  onDone?: () => void;
 }
 
 export const DEFAULT_SYSTEM_PROMPT = `You are awecode, a CLI coding agent.
@@ -134,95 +136,99 @@ export async function runChatLoop(
   messages: ModelMessage[],
   opts: ChatLoopOptions,
 ): Promise<ModelMessage[]> {
-  const providerConfig = opts.config.providers[opts.config.activeProvider];
-  if (!providerConfig) {
-    throw new Error(
-      `Active provider "${opts.config.activeProvider}" not found in config`,
-    );
-  }
-  const model = createProvider(providerConfig, opts.modelOverride);
-
-  // Seed the shared array with context entries (idempotent — caller may
-  // pre-seed). We DON'T copy `messages` — it IS the live ref the caller owns,
-  // so any external injection (e.g. from the Orchestrator) naturally appears
-  // in the next iteration.
-  const contextMessages = opts.context.toMessages();
-  for (const m of contextMessages) {
-    if (!messages.some((existing) => existing === m)) {
-      messages.push(m);
+  try {
+    const providerConfig = opts.config.providers[opts.config.activeProvider];
+    if (!providerConfig) {
+      throw new Error(
+        `Active provider "${opts.config.activeProvider}" not found in config`,
+      );
     }
-  }
+    const model = createProvider(providerConfig, opts.modelOverride);
 
-  const tools = buildToolSet(listToolDefinitions());
-  const maxIter = opts.maxIterations ?? 20;
-
-  for (let iter = 0; iter < maxIter; iter++) {
-    if (opts.abortSignal?.aborted) break;
-
-    // NOTE: real AI SDK v6 `streamText` returns a `StreamTextResult` directly
-    // (not a Promise). The brief's test mock, however, uses
-    // `mockResolvedValueOnce`, so the call yields a Promise. Awaiting a
-    // non-thenable returns the value itself, so `await` works for both the real
-    // API and the Promise-returning mock without diverging code paths.
-    const result = await streamText({
-      model,
-      messages,
-      system: opts.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-      tools,
-      maxOutputTokens: 4096,
-      abortSignal: opts.abortSignal,
-    });
-
-    let assistantText = '';
-    for await (const chunk of result.textStream) {
-      assistantText += chunk;
-      opts.onToken?.(chunk);
+    // Seed the shared array with context entries (idempotent — caller may
+    // pre-seed). We DON'T copy `messages` — it IS the live ref the caller owns,
+    // so any external injection (e.g. from the Orchestrator) naturally appears
+    // in the next iteration.
+    const contextMessages = opts.context.toMessages();
+    for (const m of contextMessages) {
+      if (!messages.some((existing) => existing === m)) {
+        messages.push(m);
+      }
     }
 
-    if (assistantText.includes('<<<< SEARCH')) {
-      opts.onDiffDetected?.(assistantText);
-    }
+    const tools = buildToolSet(listToolDefinitions());
+    const maxIter = opts.maxIterations ?? 20;
 
-    const intent = detectIntentFromText(assistantText);
-    opts.onIntentDeclared?.(intent);
+    for (let iter = 0; iter < maxIter; iter++) {
+      if (opts.abortSignal?.aborted) break;
 
-    messages.push({ role: 'assistant', content: assistantText });
-
-    const toolCalls = await result.toolCalls;
-    if (!toolCalls || toolCalls.length === 0) {
-      break; // Agent done
-    }
-
-    for (const call of toolCalls) {
-      const normalized = normalizeToolCall(call);
-      opts.onToolCall?.(normalized.name, normalized.arguments);
-      const toolResult = await dispatchTool({
-        name: normalized.name,
-        arguments: normalized.arguments,
+      // NOTE: real AI SDK v6 `streamText` returns a `StreamTextResult` directly
+      // (not a Promise). The brief's test mock, however, uses
+      // `mockResolvedValueOnce`, so the call yields a Promise. Awaiting a
+      // non-thenable returns the value itself, so `await` works for both the real
+      // API and the Promise-returning mock without diverging code paths.
+      const result = await streamText({
+        model,
+        messages,
+        system: opts.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+        tools,
+        maxOutputTokens: 4096,
+        abortSignal: opts.abortSignal,
       });
-      opts.onToolResult?.(normalized.name, toolResult);
-      // AI SDK v6 models a tool message as `ToolModelMessage` whose content is
-      // an array of `ToolResultPart` entries (not a bare string). Each part's
-      // `output` is a `ToolResultOutput` discriminated union; we serialise the
-      // awecode `ToolResult` into a `text`-shaped output so the structured
-      // success/error payload round-trips to the model as JSON-encoded text.
-      // Prefer the provider-assigned `toolCallId` (required by OpenAI /
-      // Anthropic for correlation); fall back to a synthetic id for the mock
-      // test which doesn't supply one.
-      const toolCallId = normalized.id ?? `call-${iter}-${normalized.name}`;
-      messages.push({
-        role: 'tool',
-        content: [
-          {
-            type: 'tool-result',
-            toolCallId,
-            toolName: normalized.name,
-            output: { type: 'text', value: JSON.stringify(toolResult) },
-          },
-        ],
-      });
-    }
-  }
 
-  return messages;
+      let assistantText = '';
+      for await (const chunk of result.textStream) {
+        assistantText += chunk;
+        opts.onToken?.(chunk);
+      }
+
+      if (assistantText.includes('<<<< SEARCH')) {
+        opts.onDiffDetected?.(assistantText);
+      }
+
+      const intent = detectIntentFromText(assistantText);
+      opts.onIntentDeclared?.(intent);
+
+      messages.push({ role: 'assistant', content: assistantText });
+
+      const toolCalls = await result.toolCalls;
+      if (!toolCalls || toolCalls.length === 0) {
+        break; // Agent done
+      }
+
+      for (const call of toolCalls) {
+        const normalized = normalizeToolCall(call);
+        opts.onToolCall?.(normalized.name, normalized.arguments);
+        const toolResult = await dispatchTool({
+          name: normalized.name,
+          arguments: normalized.arguments,
+        });
+        opts.onToolResult?.(normalized.name, toolResult);
+        // AI SDK v6 models a tool message as `ToolModelMessage` whose content is
+        // an array of `ToolResultPart` entries (not a bare string). Each part's
+        // `output` is a `ToolResultOutput` discriminated union; we serialise the
+        // awecode `ToolResult` into a `text`-shaped output so the structured
+        // success/error payload round-trips to the model as JSON-encoded text.
+        // Prefer the provider-assigned `toolCallId` (required by OpenAI /
+        // Anthropic for correlation); fall back to a synthetic id for the mock
+        // test which doesn't supply one.
+        const toolCallId = normalized.id ?? `call-${iter}-${normalized.name}`;
+        messages.push({
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId,
+              toolName: normalized.name,
+              output: { type: 'text', value: JSON.stringify(toolResult) },
+            },
+          ],
+        });
+      }
+    }
+
+    return messages;
+  } finally {
+    opts.onDone?.();
+  }
 }
