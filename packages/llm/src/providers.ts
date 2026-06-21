@@ -94,7 +94,16 @@ export function createProvider(
         baseURL: config.baseURL,
         apiKey,
       });
-      return provider(model);
+      // Use `.chat(model)` instead of the default `.responses(model)`.
+      // The default in AI SDK v5+ is the OpenAI Responses API
+      // (/v1/responses), but most OpenAI-compatible providers (GLM,
+      // DeepSeek, Mistral, OpenRouter, LM Studio, Ollama's OpenAI shim,
+      // etc.) only implement the classic Chat Completions API
+      // (/v1/chat/completions). Calling .responses() against them sends
+      // a request the server can't fulfil and either 404s or returns
+      // SSE-style streaming chunks that fail JSON parsing. `.chat()`
+      // pins to the universally-implemented /v1/chat/completions route.
+      return provider.chat(model);
     }
   }
 }
