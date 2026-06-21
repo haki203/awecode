@@ -46,3 +46,6 @@ export const AGENT_PACKAGE_VERSION = '0.0.0';
 export * as persistence from './persistence/sessions.js';
 
 export { applyEvent } from './persistence/session-event-handler.js';
+
+export { createProtocolSession } from './protocol-session.js';
+export type { ProtocolSession, ProtocolSessionOptions } from './protocol-session.js';

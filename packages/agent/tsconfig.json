@@ -6,7 +6,15 @@
     "jsx": "react-jsx",
     "typeRoots": ["../../node_modules/@types"],
     "types": ["node"],
-    "ignoreDeprecations": "6.0"
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      // Self-reference: when @awecode/orchestrator's .d.ts imports from
+      // @awecode/agent, redirect to our src instead of dist so the DTS
+      // build doesn't feed on its own output (TS5055). See ADR-0007.
+      "@awecode/agent": ["./src/index.ts"],
+      "@awecode/agent/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist", "tests"]
