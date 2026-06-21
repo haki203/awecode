@@ -55,6 +55,7 @@ USAGE:
 COMMANDS:
   (default)       Direct Mode chat — interactive agent TUI
   open gui        Launch the desktop GUI (Electron)
+  open web        Start the mobile PWA server (HTTPS+WS, QR-paired)
   config          Interactive LLM provider setup
   chat-test       Smoke test: send "hello" to active provider
   worktree        Manage git worktrees (list, clean)
@@ -103,6 +104,12 @@ Config: ~/.config/awecode/config.yaml
   if (args[0] === 'open' && args[1] === 'gui') {
     const { openGuiCommand } = await import('./commands/gui.js');
     await openGuiCommand(args.slice(2));
+    return;
+  }
+
+  if (args[0] === 'open' && args[1] === 'web') {
+    const { openWebCommand } = await import('./commands/web.js');
+    await openWebCommand(args.slice(2));
     return;
   }
 
