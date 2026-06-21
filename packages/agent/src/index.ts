@@ -42,3 +42,5 @@ export { getCompactionTrigger } from './context/trigger.js';
 export type { CompactionTrigger } from './context/trigger.js';
 
 export const AGENT_PACKAGE_VERSION = '0.0.0';
+
+export * as persistence from './persistence/sessions.js';
