@@ -12,4 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export { detectTestCommand } from './test-detect.js';
+export type { DetectedTestCommand } from './test-detect.js';
+
 export const ORCHESTRATOR_PACKAGE_VERSION = '0.0.0';
