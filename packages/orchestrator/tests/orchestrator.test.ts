@@ -6,6 +6,9 @@ import { simpleGit } from 'simple-git';
 import { Orchestrator } from '../src/orchestrator.js';
 import { ApprovalQueue, ContextManager } from '@awecode/agent';
 import * as readline from 'node:readline/promises';
+import type { Interface as ReadlineInterface } from 'node:readline/promises';
+
+type MockRl = Pick<ReadlineInterface, 'question' | 'close'>;
 
 let tmpRoot: string;
 
@@ -33,9 +36,11 @@ vi.mock('node:readline/promises', () => ({
 describe('Orchestrator.handleDiffDetected - Phase 1', () => {
   it('parses single block + approve → proceeds to pipeline', async () => {
     const mockFn = vi.fn();
-    const rl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
-    (readline.default as any).createInterface = mockFn.mockReturnValue(rl);
-    (readline as any).createInterface = mockFn.mockReturnValue(rl);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
+    (readline.default as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
+    (readline as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
 
     const phases: string[] = [];
     const ctx = new ContextManager();
@@ -64,9 +69,11 @@ new
 
   it('quits immediately when user types q in approval', async () => {
     const mockFn = vi.fn();
-    const rl = { question: vi.fn().mockResolvedValue('q\n'), close: vi.fn() };
-    (readline.default as any).createInterface = mockFn.mockReturnValue(rl);
-    (readline as any).createInterface = mockFn.mockReturnValue(rl);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('q\n'), close: vi.fn() };
+    (readline.default as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
+    (readline as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
 
     const phases: string[] = [];
     const ctx = new ContextManager();
@@ -92,13 +99,15 @@ new
 describe('Orchestrator.handleDiffDetected - Phase 2 (pipeline)', () => {
   it('creates worktree, applies diff, self-heals (mock runCmd), merges, commits', async () => {
     const mockFn = vi.fn();
-    const rl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
-    (readline.default as any).createInterface = mockFn.mockReturnValue(rl);
-    (readline as any).createInterface = mockFn.mockReturnValue(rl);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
+    (readline.default as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
+    (readline as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
 
     const phases: string[] = [];
     const ctx = new ContextManager();
-    const events: any[] = [];
+    const events: { type: string }[] = [];
 
     const orch = new Orchestrator({
       projectRoot: tmpRoot,
@@ -114,7 +123,7 @@ describe('Orchestrator.handleDiffDetected - Phase 2 (pipeline)', () => {
         diffFailStreak: 3,
       },
       onPhaseChange: (p) => phases.push(p),
-      onSelfHealEvent: (e) => events.push(e),
+      onSelfHealEvent: (e) => events.push(e as { type: string }),
       runCommandOverride: async () => ({ exitCode: 0, stdout: 'pass', stderr: '' }),
     });
 
@@ -141,11 +150,13 @@ describe('Orchestrator.handleDiffDetected - Phase 2 (pipeline)', () => {
 
   it('injects feedback message on apply failure (Q7/A)', async () => {
     const mockFn = vi.fn();
-    const rl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
-    (readline.default as any).createInterface = mockFn.mockReturnValue(rl);
-    (readline as any).createInterface = mockFn.mockReturnValue(rl);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
+    (readline.default as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
+    (readline as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
 
-    const chatMessages: any[] = [];
+    const chatMessages: { role: string; content: string }[] = [];
     const ctx = new ContextManager();
 
     const orch = new Orchestrator({

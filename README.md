@@ -36,6 +36,10 @@ switches to Approval Mode:
 
 See [docs/direct-mode.md](./docs/direct-mode.md) for the full Direct Mode guide.
 
+## Architecture
+
+Awecode wires a chat loop to a harness via an orchestrator layer. Each LLM diff response triggers a **Diff Cycle**: parse → approve → worktree → self-heal → merge → commit → cleanup. See [docs/orchestrator.md](docs/orchestrator.md) for details.
+
 ## Workflows
 
 For creative/complex tasks, the agent auto-emits `start_workflow("brainstorm")` and runs the brainstorm → spec → grill → plan pipeline. Skip with `/skip-workflow` or invoke phases individually via slash commands (`/brainstorm`, `/spec`, `/grill`, `/plan`).

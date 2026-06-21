@@ -4,8 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { simpleGit } from 'simple-git';
 import * as readline from 'node:readline/promises';
+import type { Interface as ReadlineInterface } from 'node:readline/promises';
 import { Orchestrator } from '../src/index.js';
 import { ApprovalQueue, ContextManager } from '@awecode/agent';
+
+type MockRl = Pick<ReadlineInterface, 'question' | 'close'>;
 
 let tmpRoot: string;
 
@@ -34,12 +37,14 @@ vi.mock('node:readline/promises', () => ({
 describe('Orchestrator E2E', () => {
   it('full cycle: parse → approve → worktree → apply → self-heal → merge → commit → cleanup', async () => {
     const mockFn = vi.fn();
-    const rl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
-    (readline.default as any).createInterface = mockFn.mockReturnValue(rl);
-    (readline as any).createInterface = mockFn.mockReturnValue(rl);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
+    (readline.default as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
+    (readline as unknown as { createInterface: unknown }).createInterface =
+      mockFn.mockReturnValue(rl);
 
     const phases: string[] = [];
-    const chatMessages: any[] = [];
+    const chatMessages: { role: string; content: string }[] = [];
 
     const orch = new Orchestrator({
       projectRoot: tmpRoot,

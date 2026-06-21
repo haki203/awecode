@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { ApprovalPrompter } from '../src/approval.js';
 import type { ParsedDiffBlock } from '../src/diff-interceptor.js';
 import * as readline from 'node:readline/promises';
+import type { Interface as ReadlineInterface } from 'node:readline/promises';
+
+type MockRl = Pick<ReadlineInterface, 'question' | 'close'>;
 
 const mockBlock: ParsedDiffBlock = {
   text: 'file_path: foo.ts\n<<<< SEARCH\na\n====\nb\n>>>> REPLACE',
@@ -25,8 +28,10 @@ vi.mock('node:readline/promises', () => ({
 
 describe('ApprovalPrompter', () => {
   it('returns accept when user types y', async () => {
-    const rl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
-    vi.mocked(readline.default.createInterface).mockReturnValue(rl as any);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('y\n'), close: vi.fn() };
+    vi.mocked(readline.default.createInterface).mockReturnValue(
+      rl as unknown as ReadlineInterface,
+    );
 
     const prompter = new ApprovalPrompter();
     const decision = await prompter.prompt(mockBlock);
@@ -35,8 +40,10 @@ describe('ApprovalPrompter', () => {
   });
 
   it('returns reject when user types n', async () => {
-    const rl = { question: vi.fn().mockResolvedValue('n\n'), close: vi.fn() };
-    vi.mocked(readline.default.createInterface).mockReturnValue(rl as any);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('n\n'), close: vi.fn() };
+    vi.mocked(readline.default.createInterface).mockReturnValue(
+      rl as unknown as ReadlineInterface,
+    );
 
     const prompter = new ApprovalPrompter();
     const decision = await prompter.prompt(mockBlock);
@@ -44,8 +51,10 @@ describe('ApprovalPrompter', () => {
   });
 
   it('returns quit when user types q', async () => {
-    const rl = { question: vi.fn().mockResolvedValue('q\n'), close: vi.fn() };
-    vi.mocked(readline.default.createInterface).mockReturnValue(rl as any);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('q\n'), close: vi.fn() };
+    vi.mocked(readline.default.createInterface).mockReturnValue(
+      rl as unknown as ReadlineInterface,
+    );
 
     const prompter = new ApprovalPrompter();
     const decision = await prompter.prompt(mockBlock);
@@ -53,8 +62,10 @@ describe('ApprovalPrompter', () => {
   });
 
   it('returns accept_all when user types a', async () => {
-    const rl = { question: vi.fn().mockResolvedValue('a\n'), close: vi.fn() };
-    vi.mocked(readline.default.createInterface).mockReturnValue(rl as any);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('a\n'), close: vi.fn() };
+    vi.mocked(readline.default.createInterface).mockReturnValue(
+      rl as unknown as ReadlineInterface,
+    );
 
     const prompter = new ApprovalPrompter();
     const decision = await prompter.prompt(mockBlock);
@@ -62,8 +73,10 @@ describe('ApprovalPrompter', () => {
   });
 
   it('returns skip_all when user types s', async () => {
-    const rl = { question: vi.fn().mockResolvedValue('s\n'), close: vi.fn() };
-    vi.mocked(readline.default.createInterface).mockReturnValue(rl as any);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('s\n'), close: vi.fn() };
+    vi.mocked(readline.default.createInterface).mockReturnValue(
+      rl as unknown as ReadlineInterface,
+    );
 
     const prompter = new ApprovalPrompter();
     const decision = await prompter.prompt(mockBlock);
@@ -71,8 +84,10 @@ describe('ApprovalPrompter', () => {
   });
 
   it('returns edit when user types e', async () => {
-    const rl = { question: vi.fn().mockResolvedValue('e\n'), close: vi.fn() };
-    vi.mocked(readline.default.createInterface).mockReturnValue(rl as any);
+    const rl: MockRl = { question: vi.fn().mockResolvedValue('e\n'), close: vi.fn() };
+    vi.mocked(readline.default.createInterface).mockReturnValue(
+      rl as unknown as ReadlineInterface,
+    );
 
     const prompter = new ApprovalPrompter();
     const decision = await prompter.prompt(mockBlock);
