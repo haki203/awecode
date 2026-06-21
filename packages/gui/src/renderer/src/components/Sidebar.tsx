@@ -12,67 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { SessionMeta } from '../../../shared/protocol.js';
-import type { WorkspaceState } from '../../../main/types.js';
 
 interface Props {
+  sessions: SessionMeta[];
   activeId: string | null;
-  workspace: WorkspaceState;
-  currentCwd: string;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
-  onPickWorkspace: () => void;
-  onSwitchWorkspace: (cwd: string) => void;
+  /** Optional header element rendered above the session list. Desktop passes workspace UI. */
+  header?: ReactNode;
 }
 
 /**
- * Cursor-style sidebar with project organization.
- *
- * Layout:
- *   [+ Open project]       ← project picker (native folder dialog)
- *   awecode                ← current project basename (clickable to switch)
- *   [+ New chat]           ← new conversation in the current workspace
- *   ─────────────────
- *   <current project>      ← sessions for the active workspace
- *     session title
- *     session title
- *   ─────────────────
- *   Recent projects        ← other workspaces, click to switch
- *     project-b
- *     project-c
+ * Shared sidebar layout. Both Desktop (via WorkspaceSidebar wrapper) and
+ * Web (via SidebarDrawer) reuse this. Owns rename/delete UI state but NOT
+ * data fetching — caller provides `sessions` via the useSessions hook.
  */
-export function Sidebar({
-  activeId,
-  workspace,
-  currentCwd,
-  onSelect,
-  onNew,
-  onDelete,
-  onRename,
-  onPickWorkspace,
-  onSwitchWorkspace,
-}: Props) {
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+export function Sidebar({ sessions, activeId, onSelect, onNew, onDelete, onRename, header }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
-
-  async function refresh(): Promise<void> {
-    const list = await window.awecode.listSessions();
-    setSessions(list);
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, [activeId, currentCwd]);
-
-  const currentName = useMemo(() => basename(currentCwd), [currentCwd]);
-  const otherRecent = useMemo(
-    () => workspace.recent.filter((p) => p !== currentCwd),
-    [workspace.recent, currentCwd],
-  );
 
   function startRename(s: SessionMeta): void {
     setEditingId(s.id);
@@ -89,32 +50,16 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
+      {header}
       <div className="sidebar-header">
-        <button
-          className="btn-open-project"
-          onClick={onPickWorkspace}
-          title="Open a different project folder"
-        >
-          <span className="icon">📁</span>
-          <span>Open project</span>
-        </button>
-        <div
-          className="current-project"
-          title={currentCwd}
-          onClick={() => onSwitchWorkspace(currentCwd)}
-        >
-          <span className="dot" />
-          <span className="name">{currentName}</span>
-        </div>
         <button className="btn-new" onClick={onNew} title="New chat">
           <span className="plus">+</span>
           <span>New chat</span>
         </button>
       </div>
-
       <div className="sidebar-list">
         {sessions.length === 0 ? (
-          <div className="sidebar-empty">No conversations in this project</div>
+          <div className="sidebar-empty">No conversations yet</div>
         ) : (
           <div className="session-group">
             {sessions.map((s) => (
@@ -164,31 +109,7 @@ export function Sidebar({
             ))}
           </div>
         )}
-
-        {otherRecent.length > 0 && (
-          <>
-            <div className="group-heading">Recent projects</div>
-            {otherRecent.map((p) => (
-              <div
-                key={p}
-                className="project-row"
-                title={p}
-                onClick={() => onSwitchWorkspace(p)}
-              >
-                <span className="icon">📁</span>
-                <span className="name">{basename(p)}</span>
-              </div>
-            ))}
-          </>
-        )}
       </div>
     </aside>
   );
-}
-
-function basename(p: string): string {
-  if (!p) return 'untitled';
-  const clean = p.replace(/\\/g, '/').replace(/\/+$/, '');
-  const parts = clean.split('/').filter(Boolean);
-  return parts[parts.length - 1] ?? p;
 }

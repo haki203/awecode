@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAgent } from './hooks/useAgent.js';
-import { Sidebar } from './components/Sidebar.js';
+import { WorkspaceSidebar } from './components/WorkspaceSidebar.js';
 import { ChatView } from './components/ChatView.js';
 import { PromptInput } from './components/PromptInput.js';
 import { StatusBar } from './components/StatusBar.js';
@@ -23,28 +23,21 @@ import { WorkflowIndicator } from './components/WorkflowIndicator.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { TransportContext } from './transport/context.js';
 import { electronClient } from './transport/electron-client.js';
-import type { WorkspaceState } from '../../main/types.js';
 
 export function App() {
   const agent = useAgent();
   const [showContext, setShowContext] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [workspace, setWorkspace] = useState<WorkspaceState>({
-    current: null,
-    recent: [],
-  });
   const [currentCwd, setCurrentCwd] = useState<string>('');
 
-  // Initial sync: pull persisted workspace + active session.
+  // Initial sync: pull persisted active session. (Workspace state is now owned
+  // by WorkspaceSidebar via useWorkspace; we only seed currentCwd here for the
+  // StatusBar fallback before the first agent 'ready' event arrives.)
   useEffect(() => {
     void (async () => {
-      const [state, cwd, session] = await Promise.all([
-        window.awecode.workspaceState(),
-        window.awecode.workspaceCurrent(),
-        window.awecode.currentSession(),
-      ]);
-      setWorkspace(state);
+      const cwd = await window.awecode.workspaceCurrent();
       setCurrentCwd(cwd);
+      const session = await window.awecode.currentSession();
       if (session) setActiveSessionId(session.id);
     })();
   }, []);
@@ -59,27 +52,6 @@ export function App() {
     return off;
   }, [agent]);
 
-  const handlePick = useCallback(async () => {
-    const picked = await window.awecode.workspacePick();
-    if (!picked) return;
-    const state = await window.awecode.workspaceOpen(picked);
-    setWorkspace(state);
-    setCurrentCwd(picked);
-    setActiveSessionId(null);
-    agent.resetForSession();
-  }, [agent]);
-
-  const handleSwitch = useCallback(
-    async (cwd: string) => {
-      const state = await window.awecode.workspaceOpen(cwd);
-      setWorkspace(state);
-      setCurrentCwd(cwd);
-      setActiveSessionId(null);
-      agent.resetForSession();
-    },
-    [agent],
-  );
-
   const handleNew = useCallback(async () => {
     const s = await window.awecode.newSession();
     if (s) setActiveSessionId(s.id);
@@ -87,44 +59,21 @@ export function App() {
   }, [agent]);
 
   const handleSelect = useCallback(
-    async (id: string) => {
-      const s = await window.awecode.openSession(id);
-      if (s) setActiveSessionId(s.id);
+    (id: string) => {
+      setActiveSessionId(id);
       agent.resetForSession();
     },
     [agent],
   );
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      await window.awecode.deleteSession(id);
-      if (id === activeSessionId) {
-        const s = await window.awecode.newSession();
-        if (s) setActiveSessionId(s.id);
-        agent.resetForSession();
-      }
-    },
-    [activeSessionId, agent],
-  );
-
-  const handleRename = useCallback(async (id: string, title: string) => {
-    await window.awecode.renameSession(id, title);
-  }, []);
-
   return (
     <ErrorBoundary>
       <TransportContext.Provider value={electronClient}>
         <div className="app-shell">
-          <Sidebar
-            activeId={activeSessionId}
-            workspace={workspace}
-            currentCwd={currentCwd}
-            onSelect={handleSelect}
-            onNew={handleNew}
-            onDelete={handleDelete}
-            onRename={handleRename}
-            onPickWorkspace={handlePick}
-            onSwitchWorkspace={handleSwitch}
+          <WorkspaceSidebar
+            activeSessionId={activeSessionId}
+            onSelectSession={handleSelect}
+            onNewSession={handleNew}
           />
           <main className="app-main">
             {agent.workflow && <WorkflowIndicator name={agent.workflow.name} />}
