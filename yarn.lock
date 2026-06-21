@@ -110,6 +110,7 @@ __metadata:
     "@awecode/diff": "workspace:*"
     "@awecode/harness": "workspace:*"
     "@awecode/llm": "workspace:*"
+    "@awecode/orchestrator": "workspace:*"
     "@awecode/workflow": "workspace:*"
     "@inkjs/ui": "npm:^2.0.0"
     "@types/node": "npm:^26.0.0"
@@ -172,7 +173,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@awecode/orchestrator@workspace:packages/orchestrator":
+"@awecode/orchestrator@workspace:*, @awecode/orchestrator@workspace:packages/orchestrator":
   version: 0.0.0-use.local
   resolution: "@awecode/orchestrator@workspace:packages/orchestrator"
   dependencies:

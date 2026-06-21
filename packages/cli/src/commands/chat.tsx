@@ -15,6 +15,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { render, Box, useInput, useApp } from 'ink';
 import { TextInput } from '@inkjs/ui';
+import { randomUUID } from 'node:crypto';
 import { loadConfig, getDefaultConfigPath, type AwecodeConfig } from '@awecode/llm';
 import { parseDiff, applyDiff } from '@awecode/diff';
 import {
@@ -24,6 +25,8 @@ import {
   type ApprovalRequest,
   type ApprovalDecision,
 } from '@awecode/agent';
+import { Orchestrator } from '@awecode/orchestrator';
+import type { ModelMessage } from 'ai';
 import { ChatView, type ChatMessage } from '../components/ChatView.js';
 import { ContextPanel } from '../components/ContextPanel.js';
 import { ApprovalView } from '../components/ApprovalView.js';
@@ -67,6 +70,17 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // exit so streamText stops hitting the provider after the Ink app tears
   // down. Cleared in handleSubmit's finally.
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Orchestrator instance (Plan 6). Lazily constructed on first
+  // onDiffDetected so we don't pay init cost for chats that never emit a
+  // diff. The orchestrator runs a full Diff Cycle (worktree → apply →
+  // self-heal → merge → commit) alongside the legacy TUI approval flow —
+  // unification is post-v0.1.
+  const orchestratorRef = useRef<Orchestrator | null>(null);
+  // Backing array for the orchestrator's chatMessages option. The self-heal
+  // loop pushes feedback messages here on apply/test failures; a future task
+  // will thread this into runChatLoop's message history (Plan 6 wires the
+  // orchestrator side only).
+  const orchestratorMessagesRef = useRef<ModelMessage[]>([]);
   // Intent Declaration: when the agent emits start_workflow(), we capture the
   // workflow name + phase to drive the WorkflowIndicator header. Cleared back
   // to null when the agent returns to Direct Mode.
@@ -140,10 +154,54 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
           setMessages((m) => [...m, { role: 'tool', content: `call ${name}` }]);
         },
         onDiffDetected: (diff) => {
+          // Existing TUI path (preserved for v0.1 backward compat):
+          // ApprovalQueue + ApprovalView still drive the interactive overlay.
           const parsed = parseDiff(diff);
           for (const p of parsed) {
             queueRef.current.enqueue(p);
           }
+
+          // New orchestrator path (Plan 6): run a full Diff Cycle in
+          // parallel. Console-only output for v0.1; TUI rendering is Plan
+          // 5b scope. Wrapped in a void IIFE because runChatLoop types
+          // this callback as (diff: string) => void (sync) — the fire-and-
+          // forget async work must not escape as a Promise.
+          void (async () => {
+            try {
+              if (!orchestratorRef.current) {
+                orchestratorRef.current = new Orchestrator({
+                  projectRoot: slashCtx.projectRoot,
+                  context,
+                  approvalQueue: queueRef.current,
+                  taskUuid: randomUUID(),
+                  abortSignal: abortController.signal,
+                  chatMessages: orchestratorMessagesRef.current,
+                  onSelfHealEvent: (e) => {
+                    console.log(`[self-heal] ${e.type}`);
+                  },
+                  onPhaseChange: (p) => {
+                    console.log(`[orchestrator] phase: ${p}`);
+                  },
+                  onApprovalDecision: (d) => {
+                    console.log(`[approval] ${d}`);
+                  },
+                });
+              }
+
+              const result = await orchestratorRef.current.handleDiffDetected(diff);
+              if (!result.success) {
+                console.error(
+                  `[orchestrator] Diff cycle failed: ${result.error ?? 'unknown'}`,
+                );
+              } else {
+                console.log(
+                  `[orchestrator] Diff cycle succeeded: ${result.mergedFiles.join(', ')}`,
+                );
+              }
+            } catch (err) {
+              console.error(`[orchestrator] threw: ${(err as Error).message}`);
+            }
+          })();
         },
         onIntentDeclared: (intent) => {
           if (intent.type === 'workflow') {
