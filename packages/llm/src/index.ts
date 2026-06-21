@@ -22,9 +22,15 @@ export type {
   OpenAICompatibleProviderConfig,
   AwecodeConfig,
   ModelRef,
+  DEFAULT_ENV_KEYS,
 } from './types.js';
 
-export { loadConfig, saveConfig, getDefaultConfigPath } from './config.js';
+export {
+  loadConfig,
+  saveConfig,
+  getDefaultConfigPath,
+  resolveApiKey,
+} from './config.js';
 export { createProvider } from './providers.js';
 export { chat, streamChat } from './chat.js';
 export type { ChatOptions, ChatResult } from './chat.js';

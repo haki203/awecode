@@ -1,4 +1,4 @@
-// Copyright 2026 Awecode Contributors
+﻿// Copyright 2026 Awecode Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@ import React, { useState } from 'react';
 import { Box, Text, render as inkRender, useInput, type Instance } from 'ink';
 import SelectInput from 'ink-select-input';
 import { TextInput } from '@inkjs/ui';
-import { PROVIDER_CHOICES, DEFAULT_MODELS } from './prompts.js';
+import { PROVIDER_CHOICES, DEFAULT_MODELS, KEY_SOURCE_CHOICES } from './prompts.js';
+import { DEFAULT_ENV_KEYS } from '@awecode/llm';
 import type { AwecodeConfig, ProviderConfig, ProviderType } from '@awecode/llm';
 
 interface WizardAppProps {
@@ -25,29 +26,56 @@ interface WizardAppProps {
 
 type WizardStep =
   | 'select-provider'
+  | 'choose-key-source'
   | 'enter-api-key'
+  | 'enter-env-key'
   | 'enter-base-url'
   | 'enter-model'
   | 'confirm';
 
 // Discriminated by the ProviderType union so the switch is exhaustive.
+// If `envKey` is set, the value is read from `process.env[envKey]` at
+// load time; `apiKey` stays inline only when the user typed a literal
+// value in the wizard.
 function buildProviderConfig(
   providerType: ProviderType,
   apiKey: string,
+  envKey: string,
   baseURL: string,
   model: string,
 ): ProviderConfig {
   switch (providerType) {
     case 'anthropic':
-      return { type: 'anthropic', apiKey, defaultModel: model };
+      return {
+        type: 'anthropic',
+        apiKey: apiKey || undefined,
+        envKey: envKey || undefined,
+        defaultModel: model,
+      };
     case 'openai':
-      return { type: 'openai', apiKey, defaultModel: model };
+      return {
+        type: 'openai',
+        apiKey: apiKey || undefined,
+        envKey: envKey || undefined,
+        defaultModel: model,
+      };
     case 'google':
-      return { type: 'google', apiKey, defaultModel: model };
+      return {
+        type: 'google',
+        apiKey: apiKey || undefined,
+        envKey: envKey || undefined,
+        defaultModel: model,
+      };
     case 'ollama':
       return { type: 'ollama', baseURL, defaultModel: model };
     case 'openai-compatible':
-      return { type: 'openai-compatible', baseURL, apiKey, defaultModel: model };
+      return {
+        type: 'openai-compatible',
+        baseURL,
+        apiKey: apiKey || undefined,
+        envKey: envKey || undefined,
+        defaultModel: model,
+      };
   }
 }
 
@@ -55,6 +83,7 @@ export function WizardApp({ onComplete }: WizardAppProps) {
   const [step, setStep] = useState<WizardStep>('select-provider');
   const [providerType, setProviderType] = useState<ProviderType | ''>('');
   const [apiKey, setApiKey] = useState('');
+  const [envKey, setEnvKey] = useState('');
   const [baseURL, setBaseURL] = useState('');
   const [model, setModel] = useState('');
 
@@ -77,7 +106,22 @@ export function WizardApp({ onComplete }: WizardAppProps) {
     } else if (item.value === 'openai-compatible') {
       setStep('enter-base-url');
     } else {
+      // Cloud providers (anthropic/openai/google) â€” route through the
+      // key-source picker so users can choose env var vs inline.
+      setStep('choose-key-source');
+    }
+  };
+
+  const handleChooseKeySource = (item: { value: string }) => {
+    if (item.value === 'inline') {
       setStep('enter-api-key');
+    } else {
+      // Pre-fill with the provider's conventional env var name so users
+      // who already export OPENAI_API_KEY / ANTHROPIC_API_KEY / etc. can
+      // just press Enter.
+      const defaultEnv = providerType === '' ? '' : (DEFAULT_ENV_KEYS[providerType] ?? '');
+      if (defaultEnv) setEnvKey(defaultEnv);
+      setStep('enter-env-key');
     }
   };
 
@@ -90,6 +134,18 @@ export function WizardApp({ onComplete }: WizardAppProps) {
         <SelectInput
           items={PROVIDER_CHOICES.map((c) => ({ label: c.label, value: c.value }))}
           onSelect={handleSelectProvider}
+        />
+      </Box>
+    );
+  }
+
+  if (step === 'choose-key-source') {
+    return (
+      <Box flexDirection="column">
+        <Text>? How do you want to provide your API key?</Text>
+        <SelectInput
+          items={KEY_SOURCE_CHOICES.map((c) => ({ label: c.label, value: c.value }))}
+          onSelect={handleChooseKeySource}
         />
       </Box>
     );
@@ -109,10 +165,29 @@ export function WizardApp({ onComplete }: WizardAppProps) {
     );
   }
 
+  if (step === 'enter-env-key') {
+    const defaultEnv = providerType === '' ? '' : (DEFAULT_ENV_KEYS[providerType] ?? '');
+    return (
+      <Box flexDirection="column">
+        <Text>? Environment variable name [{defaultEnv}]:</Text>
+        <TextInput
+          defaultValue={defaultEnv}
+          placeholder={defaultEnv}
+          onChange={setEnvKey}
+          onSubmit={() => setStep('enter-model')}
+        />
+      </Box>
+    );
+  }
+
   if (step === 'enter-base-url') {
     const placeholder =
       providerType === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com/v1';
-    const next: WizardStep = providerType === 'ollama' ? 'enter-model' : 'enter-api-key';
+    // For openai-compatible providers, after baseURL we still need to pick
+    // an API key source (some compat servers don't need a key at all, which
+    // is why we route through choose-key-source rather than enter-api-key).
+    const next: WizardStep =
+      providerType === 'ollama' ? 'enter-model' : 'choose-key-source';
     return (
       <Box flexDirection="column">
         <Text>? Base URL [{placeholder}]:</Text>
@@ -149,6 +224,7 @@ export function WizardApp({ onComplete }: WizardAppProps) {
       model={model}
       baseURL={baseURL}
       apiKey={apiKey}
+      envKey={envKey}
       onComplete={onComplete}
     />
   );
@@ -159,6 +235,7 @@ interface ConfirmScreenProps {
   model: string;
   baseURL: string;
   apiKey: string;
+  envKey: string;
   onComplete: (config: AwecodeConfig | null) => void;
 }
 
@@ -167,16 +244,17 @@ function ConfirmScreen({
   model,
   baseURL,
   apiKey,
+  envKey,
   onComplete,
 }: ConfirmScreenProps) {
   useInput((input, key) => {
     if (key.return) {
       if (providerType === '') {
-        // Defensive — should be unreachable.
+        // Defensive â€” should be unreachable.
         onComplete(null);
         return;
       }
-      const cfg = buildProviderConfig(providerType, apiKey, baseURL, model);
+      const cfg = buildProviderConfig(providerType, apiKey, envKey, baseURL, model);
       onComplete({
         activeProvider: providerType,
         providers: { [providerType]: cfg },
@@ -193,6 +271,8 @@ function ConfirmScreen({
       <Text>  Provider: {providerType}</Text>
       <Text>  Model: {model}</Text>
       {baseURL !== '' && <Text>  Base URL: {baseURL}</Text>}
+      {envKey !== '' && <Text>  API key: from env ${envKey}</Text>}
+      {envKey === '' && apiKey !== '' && <Text>  API key: (stored inline)</Text>}
       <Text> </Text>
       <Text>Press Enter to save, Esc to cancel.</Text>
     </Box>

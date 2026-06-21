@@ -27,6 +27,12 @@ export interface ChatOptions {
   maxTokens?: number;
   /** Sampling temperature. Provider-specific defaults apply when unset. */
   temperature?: number;
+  /**
+   * Override the provider's configured `defaultModel` for this call only.
+   * Useful for the `awecode --model <name>` runtime flag without rewriting
+   * the config file.
+   */
+  modelOverride?: string;
 }
 
 /**
@@ -72,7 +78,7 @@ export async function chat(
   messages: ModelMessage[],
   opts: ChatOptions = {},
 ): Promise<ChatResult> {
-  const model = createProvider(resolveProviderConfig(config));
+  const model = createProvider(resolveProviderConfig(config), opts.modelOverride);
   const result = await generateText({
     model,
     messages,
@@ -109,7 +115,7 @@ export async function* streamChat(
   messages: ModelMessage[],
   opts: ChatOptions = {},
 ): AsyncGenerator<string> {
-  const model = createProvider(resolveProviderConfig(config));
+  const model = createProvider(resolveProviderConfig(config), opts.modelOverride);
   const result = await streamText({
     model,
     messages,

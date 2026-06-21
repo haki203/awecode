@@ -42,7 +42,31 @@ awecode chat-test
 # Enter Direct Mode TUI (no args), or pass a prompt directly
 awecode
 awecode "fix typo 'recieve' -> 'receive' in src/foo.ts"
+
+# Override the model or provider at runtime (no config edit needed)
+awecode --model gpt-4o "refactor the auth module"
+awecode -m claude-3-5-sonnet --provider anthropic "write a migration"
 ```
+
+### Keeping API keys out of dotfiles
+
+Instead of pasting your API key into `~/.config/awecode/config.yaml`,
+reference an environment variable:
+
+```yaml
+# ~/.config/awecode/config.yaml
+activeProvider: openai
+providers:
+  openai:
+    type: openai
+    envKey: OPENAI_API_KEY        # reads process.env.OPENAI_API_KEY at load
+    defaultModel: gpt-4o-mini
+```
+
+Or skip the YAML entirely — awecode auto-detects conventional env vars
+(`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`)
+when no `apiKey`/`envKey` is set. The wizard's "Environment variable"
+option sets this up for you.
 
 In Direct Mode, the agent streams a response. When it emits a Diff Block, the
 orchestrator kicks off a **Diff Cycle**:

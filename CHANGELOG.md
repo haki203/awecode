@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`--model <name>` runtime flag** — override the active provider's
+  `defaultModel` without editing the config file. E.g.
+  `awecode --model gpt-4o "fix the bug"` runs the whole chat session
+  against `gpt-4o` even if the YAML says `gpt-4o-mini`. Short alias `-m`.
+- **`--provider <id>` runtime flag** — switch the active provider by id
+  for this session. Must match a key in `providers` in the config file.
+  Short alias `-p`.
+- **`envKey` field on provider configs** — declare an environment
+  variable name instead of hardcoding the API key in YAML. Resolution
+  order at load time: explicit `envKey` → inline `apiKey` → provider's
+  conventional default (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY` /
+  `GOOGLE_GENERATIVE_AI_API_KEY`). Users who already export those vars
+  can leave the key fields entirely out of the config file.
+- **Wizard now asks "How do you want to provide your API key?"** with
+  two options: `env` (recommended, key stays out of dotfiles) or `inline`
+  (stored in `~/.config/awecode/config.yaml`). Env path pre-fills the
+  provider's conventional name so users can just press Enter.
 - `@awecode/orchestrator` package: glues the chat loop to the harness
   primitives. Each LLM diff response triggers a full Diff Cycle
   (parse → approve → worktree → apply → self-heal → merge → commit

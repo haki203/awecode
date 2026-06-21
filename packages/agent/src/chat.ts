@@ -26,6 +26,13 @@ export interface ChatLoopOptions {
   systemPrompt?: string;
   maxIterations?: number;
   abortSignal?: AbortSignal;
+  /**
+   * Override the provider's configured `defaultModel` for this chat
+   * invocation only. Lets `awecode --model gpt-4o` swap models without
+   * editing the config file. The override is applied to every iteration
+   * of this chat loop.
+   */
+  modelOverride?: string;
   onToken?: (chunk: string) => void;
   onToolCall?: (name: string, args: unknown) => void;
   onToolResult?: (name: string, result: unknown) => void;
@@ -125,7 +132,7 @@ export async function runChatLoop(
       `Active provider "${opts.config.activeProvider}" not found in config`,
     );
   }
-  const model = createProvider(providerConfig);
+  const model = createProvider(providerConfig, opts.modelOverride);
 
   // Seed the shared array with context entries (idempotent — caller may
   // pre-seed). We DON'T copy `messages` — it IS the live ref the caller owns,

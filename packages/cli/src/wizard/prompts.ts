@@ -28,3 +28,16 @@ export const DEFAULT_MODELS: Record<string, string> = {
   ollama: 'llama3',
   'openai-compatible': '',
 };
+
+/**
+ * Choices for the "how do you want to provide your API key?" step of the
+ * wizard. `env` reads the key from a named environment variable (safer —
+ * doesn't end up in the YAML file); `inline` pastes the literal key.
+ */
+export const KEY_SOURCE_CHOICES = [
+  {
+    label: 'Environment variable (recommended — key stays out of dotfiles)',
+    value: 'env',
+  },
+  { label: 'Paste key inline (stored in ~/.config/awecode/config.yaml)', value: 'inline' },
+] as const;

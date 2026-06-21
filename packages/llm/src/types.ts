@@ -12,30 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type ProviderType =
-  | 'anthropic'
-  | 'openai'
-  | 'google'
-  | 'ollama'
-  | 'openai-compatible';
-
+/**
+ * Shared shape for every provider config. `defaultModel` is the model name
+ * the provider SDK will be invoked with (e.g. `gpt-4o-mini`,
+ * `claude-3-5-sonnet`, `llama3`). Can be overridden at runtime via the
+ * `--model` CLI flag without rewriting the config file.
+ */
 export interface BaseProviderConfig {
   defaultModel: string;
 }
 
+/**
+ * Optional API-key sourcing. Instead of hardcoding `apiKey` in
+ * `~/.config/awecode/config.yaml` (which risks leaking via dotfiles
+ * repos), users can set `envKey: OPENAI_API_KEY` and the resolver will
+ * read the key from `process.env.OPENAI_API_KEY` at load time.
+ *
+ * Resolution order at runtime:
+ *   1. If `envKey` is set AND `process.env[envKey]` is non-empty → use it
+ *   2. Else if `apiKey` is set → use it
+ *   3. Else the provider call throws a descriptive error
+ *
+ * If both `envKey` and `apiKey` are set, `envKey` wins (this lets users
+ * temporarily override a file value via env without editing the file).
+ */
 export interface AnthropicProviderConfig extends BaseProviderConfig {
   type: 'anthropic';
-  apiKey: string;
+  apiKey?: string;
+  envKey?: string;
 }
 
 export interface OpenAIProviderConfig extends BaseProviderConfig {
   type: 'openai';
-  apiKey: string;
+  apiKey?: string;
+  envKey?: string;
 }
 
 export interface GoogleProviderConfig extends BaseProviderConfig {
   type: 'google';
-  apiKey: string;
+  apiKey?: string;
+  envKey?: string;
 }
 
 export interface OllamaProviderConfig extends BaseProviderConfig {
@@ -46,7 +62,8 @@ export interface OllamaProviderConfig extends BaseProviderConfig {
 export interface OpenAICompatibleProviderConfig extends BaseProviderConfig {
   type: 'openai-compatible';
   baseURL: string;
-  apiKey: string;
+  apiKey?: string;
+  envKey?: string;
 }
 
 export type ProviderConfig =
@@ -55,6 +72,13 @@ export type ProviderConfig =
   | GoogleProviderConfig
   | OllamaProviderConfig
   | OpenAICompatibleProviderConfig;
+
+export type ProviderType =
+  | 'anthropic'
+  | 'openai'
+  | 'google'
+  | 'ollama'
+  | 'openai-compatible';
 
 export interface AwecodeConfig {
   activeProvider: string;
@@ -65,3 +89,17 @@ export interface ModelRef {
   providerId: string;
   modelName: string;
 }
+
+/**
+ * Conventional env var name for each provider type when the user hasn't
+ * set `envKey` explicitly. Used as a fallback so awecode "just works" for
+ * users who already export `OPENAI_API_KEY` in their shell — they can
+ * leave both `apiKey` and `envKey` out of the YAML entirely.
+ */
+export const DEFAULT_ENV_KEYS: Record<ProviderType, string | null> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+  ollama: null,
+  'openai-compatible': null,
+};

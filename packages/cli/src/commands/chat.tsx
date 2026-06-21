@@ -255,13 +255,65 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   );
 }
 
-export async function chatCommand(initialPrompt?: string): Promise<void> {
-  const configPath = process.env.AWECODE_CONFIG_PATH ?? getDefaultConfigPath();
-  const config = await loadConfig(configPath);
+export interface ChatCommandOptions {
+  /** Override the active provider's `defaultModel` for this session. */
+  model?: string;
+  /**
+   * Switch the active provider by id (must match a key in
+   * `providers` from the config file).
+   */
+  provider?: string;
+}
 
-  if (!config) {
+function applyOverrides(
+  config: AwecodeConfig,
+  opts: ChatCommandOptions,
+): AwecodeConfig {
+  if (!opts.model && !opts.provider) return config;
+  const activeProvider = opts.provider ?? config.activeProvider;
+  const providerConfig = config.providers[activeProvider];
+  if (!providerConfig) {
+    throw new Error(
+      `Provider "${activeProvider}" not found in config. ` +
+        `Available: ${Object.keys(config.providers).join(', ')}`,
+    );
+  }
+  return {
+    activeProvider,
+    providers: {
+      ...config.providers,
+      [activeProvider]: opts.model
+        ? { ...providerConfig, defaultModel: opts.model }
+        : providerConfig,
+    },
+  };
+}
+
+export async function chatCommand(
+  initialPrompt?: string,
+  opts: ChatCommandOptions = {},
+): Promise<void> {
+  const configPath = process.env.AWECODE_CONFIG_PATH ?? getDefaultConfigPath();
+  const loaded = await loadConfig(configPath);
+
+  if (!loaded) {
     console.error(`No config found at ${configPath}. Run 'awecode config' first.`);
     process.exit(1);
+  }
+
+  let config: AwecodeConfig;
+  try {
+    config = applyOverrides(loaded, opts);
+  } catch (err) {
+    console.error((err as Error).message);
+    process.exit(1);
+  }
+
+  if (opts.model) {
+    console.log(`[awecode] using model override: ${opts.model}`);
+  }
+  if (opts.provider) {
+    console.log(`[awecode] using provider override: ${opts.provider}`);
   }
 
   const context = new ContextManager();
