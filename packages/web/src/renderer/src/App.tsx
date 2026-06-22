@@ -13,9 +13,37 @@ import type { Session } from '@awecode/gui/shared/protocol';
 import { apiClient } from './transport/client.js';
 import { SidebarDrawer } from './components/SidebarDrawer.js';
 import { MenuToggle } from './components/MenuToggle.js';
-import { TranscriptView } from './components/TranscriptView.js';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt.js';
 import { useNotifications } from './hooks/useNotifications.js';
+
+/**
+ * Tracks the mobile soft keyboard via the VisualViewport API and publishes
+ * the visible pixel height as the CSS custom property `--app-vh` on
+ * `.app-shell`. This is the robust fallback for browsers that mis-behave
+ * with `100dvh` (notably older iOS Safari) — when the keyboard opens, the
+ * app shell shrinks to the visible region so the prompt input and send
+ * button stay on-screen instead of being covered by the keyboard.
+ *
+ * Browsers without `visualViewport` fall back to `100dvh` via CSS.
+ */
+function useMobileViewportHeight() {
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const apply = () => {
+      const h = Math.round(vv.height);
+      document.documentElement.style.setProperty('--app-vh', `${h}px`);
+    };
+    apply();
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    return () => {
+      vv.removeEventListener('resize', apply);
+      vv.removeEventListener('scroll', apply);
+      document.documentElement.style.removeProperty('--app-vh');
+    };
+  }, []);
+}
 
 export function App() {
   return (
@@ -28,6 +56,7 @@ export function App() {
 }
 
 function AppInner() {
+  useMobileViewportHeight();
   const agent = useAgent();
   const sessions = useSessions(apiClient as unknown as TransportClient);
   const notifications = useNotifications();
@@ -68,7 +97,25 @@ function AppInner() {
 
           <main className="app-main">
             {viewing ? (
-              <TranscriptView session={viewing} />
+              <div className="transcript-view">
+                <div className="resume-banner">
+                  <span>Viewing past session · </span>
+                  <button
+                    onClick={() => {
+                      apiClient.resume(viewing.id);
+                      setViewing(null);
+                    }}
+                  >
+                    Continue here
+                  </button>
+                </div>
+                <div className="app-body">
+                  <ChatView
+                    messages={viewing.messages.map((m) => ({ role: m.role, content: m.content }))}
+                    isStreaming={false}
+                  />
+                </div>
+              </div>
             ) : (
               <>
                 {agent.workflow && <WorkflowIndicator name={agent.workflow.name} />}
@@ -89,6 +136,7 @@ function AppInner() {
               usedTokens={agent.context.totalTokens}
               budgetTokens={agent.context.budgetTokens}
               isStreaming={agent.isStreaming}
+              transportStatus={agent.transportStatus}
             />
           </main>
           <PwaInstallPrompt />

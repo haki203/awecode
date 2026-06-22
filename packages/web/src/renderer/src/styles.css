@@ -1,13 +1,30 @@
 /* Import shared desktop styles, then add mobile overrides. */
 @import '../../../../gui/src/renderer/src/styles.css';
 
+/*
+ * Mobile keyboard handling.
+ * On mobile, the soft keyboard covers the bottom of `100vh` layouts.
+ * We use `100dvh` (dynamic viewport height) which shrinks when the
+ * keyboard opens, plus a JS-driven fallback (see App.tsx) that sets
+ * `--vh` from `visualViewport.height` for browsers without dvh support.
+ */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+.app-shell {
+  /* JS fallback: visualViewport listener sets this to px when available */
+  height: var(--app-vh, 100dvh);
+}
+
 /* ===== Mobile-only overrides ===== */
 @media (max-width: 768px) {
   .app-shell {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    /* `100dvh` shrinks when the soft keyboard opens so the prompt
+       input is pushed up and stays visible above the keyboard. */
+    height: var(--app-vh, 100dvh);
+    /* Safe-area insets are handled per-region (status bar, prompt input)
+       via their own env() padding so we don't double-apply here. */
   }
 
   .sidebar {
@@ -43,7 +60,72 @@
 
   .app-main { padding-top: 48px; }
   .prompt-input textarea { font-size: 16px; } /* prevent iOS zoom on focus */
-  .status-bar { height: 44px; }
+
+  /* Tighten horizontal padding everywhere on phones — the 20px desktop
+     padding eats too much width on a 360–414px screen. */
+  .app-body { padding: 0 12px; }
+  .prompt-input {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  }
+  .prompt-input textarea {
+    flex: 1 1 auto;
+    min-height: 40px;
+    max-height: 160px;
+    padding: 9px 12px;
+  }
+  .prompt-actions {
+    flex: 0 0 auto;
+    align-self: flex-end;
+  }
+
+  /* Chat: denser message spacing — the 10px gap + 16px vertical padding
+     reads as airy on desktop but cluttered on a small screen. */
+  .chat-view {
+    padding: 8px 0 12px;
+    gap: 6px;
+  }
+  .msg { line-height: 1.5; }
+  .msg-tool { font-size: 11px; }
+
+  /* Status bar: two rows on mobile so brand/model/cwd/context/streaming
+     don't cram into a single 28px line. Row 1 = identity + live status,
+     row 2 = cwd + context meter. We also let the bar size to content
+     instead of a fixed height. */
+  .status-bar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+    gap: 2px 10px;
+    font-size: 11px;
+  }
+  .status-left {
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 6px;
+  }
+  .status-center {
+    order: 2;
+    margin-left: auto;
+    gap: 6px;
+  }
+  .status-right {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+    gap: 8px;
+  }
+  .status-bar .status-cwd {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40vw;
+  }
+  .ctx-meter { min-width: 0; }
+  .ctx-meter .ctx-bar { width: 40px; }
   .status-bar .ctx-toggle { display: none; } /* hide "Show ctx" on mobile */
 }
 
@@ -61,6 +143,28 @@
   border-bottom: 1px solid var(--border);
   color: var(--c-text-dim);
   font-size: 12px;
+}
+
+/* Resume banner — read-only past session with a Continue button */
+.resume-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--c-text-dim);
+  font-size: 12px;
+}
+
+.resume-banner button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--c-accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
 }
 
 /* PWA install prompt */

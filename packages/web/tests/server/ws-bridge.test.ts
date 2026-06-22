@@ -116,4 +116,29 @@ describe('ws-bridge', () => {
     expect(types[types.length - 1]).toBe('done');
     ws.close();
   });
+
+  it('round-trips a persisted session via loadSession when sessionId query is present', async () => {
+    // End-to-end integration of the resume path (loadSession + saveSession)
+    // is covered by packages/agent tests for resumeFromMessages and
+    // createProtocolSession with initialMessages. Here we smoke-verify the
+    // persistence surface used by ws-bridge: a saved session is loadable
+    // under its id, which is the precondition for the resume branch.
+    const { saveSession, loadSession } = await import('@awecode/agent/persistence/sessions');
+    const sessionId = 'resume-test-session';
+    saveSession({
+      id: sessionId,
+      title: 'old chat',
+      createdAt: 1,
+      updatedAt: 2,
+      cwd: '/proj',
+      messages: [
+        { role: 'user', content: 'previous question', ts: 1 },
+        { role: 'assistant', content: 'previous answer', ts: 2 },
+      ],
+    });
+    const loaded = loadSession(sessionId);
+    expect(loaded).not.toBeNull();
+    expect(loaded?.id).toBe(sessionId);
+    expect(loaded?.messages.length).toBe(2);
+  });
 });

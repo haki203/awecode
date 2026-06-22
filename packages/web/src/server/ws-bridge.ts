@@ -5,10 +5,12 @@ import { randomUUID } from 'node:crypto';
 import { verifyBearer } from './auth.js';
 import type { GuiAgentEvent, GuiClientCommand } from '@awecode/gui/shared/protocol';
 import type { AwecodeConfig } from '@awecode/llm';
+import type { ModelMessage } from 'ai';
 import type { ContextManager, ProtocolSession } from '@awecode/agent';
-import { applyEvent } from '@awecode/agent';
+import { applyEvent, resumeFromMessages } from '@awecode/agent';
 import {
   saveSession,
+  loadSession,
   DEFAULT_TITLE,
   type Session,
 } from '@awecode/agent/persistence/sessions';
@@ -22,6 +24,7 @@ export type ProtocolSessionFactory = (opts: {
   context: ContextManager;
   cwd: string;
   send: (ev: GuiAgentEvent) => void;
+  initialMessages?: ModelMessage[];
 }) => ProtocolSession;
 
 export interface WsCtx {
@@ -63,17 +66,42 @@ export function attachWsServer(server: Server, wss: WebSocketServer, ctx: WsCtx)
     });
   });
 
-  wss.on('connection', (ws: WebSocket) => {
-    // Each connection gets its own Session record.
-    const sessionRecord: Session = {
-      id: randomUUID(),
-      title: DEFAULT_TITLE,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      cwd: ctx.cwd,
-      messages: [],
-    };
-    saveSession(sessionRecord);
+  wss.on('connection', (ws: WebSocket, req) => {
+    const url = new URL(req.url ?? '/', 'http://x');
+    const requestedSessionId = url.searchParams.get('sessionId');
+
+    let sessionRecord: Session;
+    let initialMessages: ModelMessage[] | undefined;
+
+    if (requestedSessionId) {
+      const existing = loadSession(requestedSessionId);
+      if (existing) {
+        sessionRecord = existing;
+        initialMessages = resumeFromMessages(existing.messages);
+      } else {
+        // Session not found — fall back to creating a new one.
+        sessionRecord = {
+          id: randomUUID(),
+          title: DEFAULT_TITLE,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          cwd: ctx.cwd,
+          messages: [],
+        };
+        saveSession(sessionRecord);
+      }
+    } else {
+      // New session per connection (legacy behavior).
+      sessionRecord = {
+        id: randomUUID(),
+        title: DEFAULT_TITLE,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        cwd: ctx.cwd,
+        messages: [],
+      };
+      saveSession(sessionRecord);
+    }
 
     // Each connection gets its own ProtocolSession bound to this WS.
     const session = ctx.createProtocolSession({
@@ -89,6 +117,7 @@ export function attachWsServer(server: Server, wss: WebSocketServer, ctx: WsCtx)
           ws.send(JSON.stringify(ev));
         }
       },
+      ...(initialMessages ? { initialMessages } : {}),
     });
 
     ws.on('message', (raw) => {
