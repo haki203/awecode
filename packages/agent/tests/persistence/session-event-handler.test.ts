@@ -97,4 +97,25 @@ describe('applyEvent', () => {
     applyEvent(s, { type: 'done' });
     expect(s.updatedAt).toBeGreaterThanOrEqual(1);
   });
+
+  it('does NOT overwrite a user-set title on later user messages', () => {
+    const s: Session = {
+      ...emptySession,
+      title: 'My custom name',
+      messages: [{ role: 'user', content: 'first prompt', ts: 1 }],
+    };
+    applyEvent(s, { type: 'message', role: 'user', content: 'second prompt' });
+    expect(s.title).toBe('My custom name');
+  });
+
+  it('derives title from first user message with markdown stripped and newlines collapsed', () => {
+    const s: Session = { ...emptySession, messages: [] };
+    applyEvent(s, {
+      type: 'message',
+      role: 'user',
+      content: 'Line one\nLine two with **markdown**',
+    });
+    // After deriveTitle: **markdown** → markdown, newlines → spaces, first sentence (no period → no split)
+    expect(s.title).toBe('Line one Line two with markdown');
+  });
 });
