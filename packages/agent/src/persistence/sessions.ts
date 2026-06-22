@@ -54,6 +54,17 @@ const SESSIONS_DIR = resolve(
     join(homedir(), '.awecode', 'sessions'),
 );
 
+/**
+ * Session ids must be safe filenames: alphanumerics, underscore, hyphen.
+ * Rejects anything containing path separators or traversal sequences.
+ * Returns the id if valid, or null if unsafe. This is the canonical
+ * defense against path-traversal attacks via crafted session ids — every
+ * function below relies on it to prevent escaping SESSIONS_DIR.
+ */
+function safeSessionId(id: string): string | null {
+  return /^[A-Za-z0-9_-]+$/.test(id) ? id : null;
+}
+
 function sessionPath(id: string): string {
   return join(SESSIONS_DIR, `${id}.json`);
 }
@@ -91,6 +102,7 @@ export function listSessionsInWorkspace(cwd: string): SessionMeta[] {
 }
 
 export function loadSession(id: string): Session | null {
+  if (safeSessionId(id) === null) return null;
   const p = sessionPath(id);
   if (!existsSync(p)) return null;
   try {
@@ -101,6 +113,7 @@ export function loadSession(id: string): Session | null {
 }
 
 export function saveSession(s: Session): void {
+  if (safeSessionId(s.id) === null) return;
   ensureSessionsDir();
   const dir = dirname(sessionPath(s.id));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -108,11 +121,13 @@ export function saveSession(s: Session): void {
 }
 
 export function deleteSession(id: string): void {
+  if (safeSessionId(id) === null) return;
   const p = sessionPath(id);
   if (existsSync(p)) rmSync(p, { force: true });
 }
 
 export function renameSession(id: string, title: string): SessionMeta | null {
+  if (safeSessionId(id) === null) return null;
   const s = loadSession(id);
   if (!s) return null;
   s.title = title.slice(0, 120) || s.title;

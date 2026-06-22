@@ -37,4 +37,33 @@ describe('persistence/sessions', () => {
     const { deleteSession } = await import('../../src/persistence/sessions.js');
     expect(() => deleteSession('nonexistent')).not.toThrow();
   });
+
+  it('refuses to load a session with path-traversal characters', async () => {
+    const { loadSession } = await import('../../src/persistence/sessions.js');
+    expect(loadSession('../../config')).toBeNull();
+    expect(loadSession('..%2Fconfig')).toBeNull();
+    expect(loadSession('a/b')).toBeNull();
+    expect(loadSession('')).toBeNull();
+  });
+
+  it('refuses to delete a session with path-traversal characters', async () => {
+    const { deleteSession, saveSession, loadSession } = await import('../../src/persistence/sessions.js');
+    expect(() => deleteSession('../../config')).not.toThrow();
+    // Save a sentinel, attempt bad delete targeting it via traversal, then verify sentinel survives.
+    saveSession({ id: 'sentinel-test', title: 't', createdAt: 1, updatedAt: 1, cwd: '/x', messages: [] });
+    deleteSession('../sentinel-test');
+    expect(loadSession('sentinel-test')).not.toBeNull();
+    deleteSession('sentinel-test');
+  });
+
+  it('refuses to rename a session with path-traversal characters', async () => {
+    const { renameSession } = await import('../../src/persistence/sessions.js');
+    expect(renameSession('../../config', 'hacked')).toBeNull();
+  });
+
+  it('refuses to save a session with path-traversal characters in id', async () => {
+    const { saveSession, loadSession } = await import('../../src/persistence/sessions.js');
+    saveSession({ id: '../../malicious', title: 't', createdAt: 1, updatedAt: 1, cwd: '/x', messages: [] });
+    expect(loadSession('../../malicious')).toBeNull();
+  });
 });

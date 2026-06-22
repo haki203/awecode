@@ -68,6 +68,9 @@ export function createRouter(ctx: RouterCtx): Router {
       const m = path.match(/^\/api\/sessions\/([^/]+)$/);
       if (m) {
         const id = decodeURIComponent(m[1]!);
+        if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+          return json(400, { error: 'invalid session id' });
+        }
         if (method === 'GET') {
           const s = loadSession(id);
           return s ? json(200, s) : json(404, { error: 'not found' });
