@@ -53,11 +53,15 @@ function AppInner() {
   }, []);
 
   // Reset renderer state whenever the bridge swaps session (new chat,
-  // switch, workspace change).
+  // switch, workspace change). When reopening a past session, also load the
+  // persisted messages so the transcript is visible immediately.
   useEffect(() => {
-    const off = window.awecode.onSessionLoaded(({ session }) => {
+    const off = window.awecode.onSessionLoaded(({ session, messages }) => {
       setActiveSessionId(session.id);
       agent.resetForSession();
+      if (messages && messages.length > 0) {
+        agent.loadMessages(messages);
+      }
     });
     return off;
   }, [agent]);

@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTransport } from '../transport/context.js';
+import type { TransportStatus } from '../transport/context.js';
 import type {
   ContextEntrySnapshot,
   GuiAgentEvent,
@@ -43,9 +44,16 @@ export interface UseAgent {
   isStreaming: boolean;
   workflow: { name: string } | null;
   lastError: string | null;
+  transportStatus: TransportStatus;
   send: (text: string) => void;
   abort: () => void;
   resetForSession: () => void;
+  /**
+   * Seed the transcript with persisted messages when a session is reopened.
+   * Complements resetForSession (which clears state) by immediately
+   * restoring the prior conversation so the user sees their history.
+   */
+  loadMessages: (msgs: ChatMessage[]) => void;
   /** Register a callback fired whenever the agent's 'done' event arrives. */
   onDone: (cb: () => void) => () => void;
 }
@@ -67,6 +75,9 @@ export function useAgent(): UseAgent {
   const [isStreaming, setIsStreaming] = useState(false);
   const [workflow, setWorkflow] = useState<{ name: string } | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [transportStatus, setTransportStatus] = useState<TransportStatus>(
+    client.getStatus(),
+  );
   const streamingRef = useRef(false);
   const doneCbs = useRef(new Set<() => void>());
 
@@ -92,10 +103,11 @@ export function useAgent(): UseAgent {
               { role: 'assistant', content: ev.content },
             ]);
           } else {
-            setMessages((m) => [
-              ...m,
-              { role: 'user', content: ev.content },
-            ]);
+            // Server echoes the user's text back. Drop it — we already
+            // echoed optimistically in send() to avoid the "I sent a
+            // message but it didn't appear" UX when the echo is slow or
+            // lost (e.g. socket drops mid-turn).
+            break;
           }
           break;
         case 'token': {
@@ -151,6 +163,36 @@ export function useAgent(): UseAgent {
     return off;
   }, [client]);
 
+  /**
+   * Connection watchdog. When the transport drops while a stream is in
+   * flight, the server's terminal `done` event is lost (it's only emitted
+   * over the live socket), so `isStreaming` would hang on `true` forever
+   * and the prompt would stay disabled — manifesting as a stuck "agent is
+   * working…" state with no way to send another message. On any transition
+   * away from 'open', if we believe we're streaming, surface a synthetic
+   * error message and flip streaming off so the user can retry.
+   */
+  useEffect(() => {
+    const off = client.onStatus((s) => {
+      setTransportStatus(s);
+      if (s !== 'open' && streamingRef.current) {
+        streamingRef.current = false;
+        setIsStreaming(false);
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'error',
+            content:
+              s === 'closed'
+                ? 'connection lost — message not delivered. Reconnecting…'
+                : 'reconnecting…',
+          },
+        ]);
+      }
+    });
+    return off;
+  }, [client]);
+
   const send = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -158,9 +200,11 @@ export function useAgent(): UseAgent {
     streamingRef.current = true;
     setIsStreaming(true);
     setLastError(null);
-    // Do NOT optimistically echo here — the CLI's internal-mode protocol
-    // server emits a 'message'/'user' event back, which useAgent appends.
-    // Echoing here too would double the user's message.
+    // Echo the user's message immediately so the user sees it in the
+    // transcript even if the server's echo is slow or the socket dies
+    // before the echo frame arrives. The server-sent `message`/`user`
+    // echo is dropped in the onEvent handler above to avoid duplication.
+    setMessages((m) => [...m, { role: 'user', content: trimmed }]);
     void client.send({ type: 'prompt', text });
   }, [client]);
 
@@ -185,6 +229,17 @@ export function useAgent(): UseAgent {
     streamingRef.current = false;
   }, []);
 
+  /**
+   * Seed the transcript with persisted messages when a session is reopened.
+   * Called after resetForSession so the user sees their prior conversation
+   * rendered in the chat view. Don't touch isStreaming / workflow / context —
+   * those will be re-populated by the ready/context_snapshot events from the
+   * new session once the agent reconnects.
+   */
+  const loadMessages = useCallback((msgs: ChatMessage[]) => {
+    setMessages(msgs);
+  }, []);
+
   const onDone = useCallback((cb: () => void) => {
     doneCbs.current.add(cb);
     return () => {
@@ -199,9 +254,11 @@ export function useAgent(): UseAgent {
     isStreaming,
     workflow,
     lastError,
+    transportStatus,
     send,
     abort,
     resetForSession,
+    loadMessages,
     onDone,
   };
 }
