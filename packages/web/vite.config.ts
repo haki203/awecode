@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@awecode/gui/renderer': resolve(__dirname, '../gui/src/renderer/src'),
+      '@awecode/gui/renderer/src': resolve(__dirname, '../gui/src/renderer/src'),
       '@awecode/gui/shared': resolve(__dirname, '../gui/src/shared'),
     },
   },
