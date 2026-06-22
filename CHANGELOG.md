@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No released changes yet._
+
+## [0.1.0] — 2026-06-22
+
+_First feature release: the orchestrator pipeline lands. This version wires
+the chat loop to the git worktree harness via the Diff Cycle (parse →
+approve → worktree → apply → self-heal → merge → commit → cleanup),
+stabilizes the workflow engine auto-trigger, and adds runtime
+`--model`/`--provider` overrides._
+
 ### Added
 - **`--model <name>` runtime flag** — override the active provider's
   `defaultModel` without editing the config file. E.g.

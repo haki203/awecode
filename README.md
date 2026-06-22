@@ -1,6 +1,8 @@
 # Awecode
 
-[![CI](https://github.com/<owner>/awecode/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+<!-- TODO: demo GIF — record a short TUI session (Direct Mode + a Diff Cycle) and embed here as `docs/assets/awecode-demo.gif` -->
+
+[![CI](https://github.com/haki203/awecode/actions/workflows/ci.yml/badge.svg)](https://github.com/haki203/awecode/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](package.json)
 [![TypeScript](https://img.shields.io/badge/typescript-strict-blue)](tsconfig.base.json)
@@ -175,7 +177,7 @@ Cached at `.awecode/cache/repo-map.json`, keyed by git commit hash.
 ## Development
 
 ```bash
-git clone https://github.com/<your-fork>/awecode.git
+git clone https://github.com/haki203/awecode.git
 cd awecode
 yarn install
 yarn build
