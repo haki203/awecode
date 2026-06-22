@@ -17,6 +17,9 @@ export {
   createEntry,
   createFileEntry,
   createCommandOutputEntry,
+  createUserMessageEntry,
+  createAssistantMessageEntry,
+  createToolResultEntry,
   createDiffEntry,
 } from './context/entry.js';
 
@@ -30,7 +33,7 @@ export { detectIntentFromText } from './intent.js';
 export type { IntentDeclaration } from './intent.js';
 
 export { runChatLoop, DEFAULT_SYSTEM_PROMPT } from './chat.js';
-export type { ChatLoopOptions } from './chat.js';
+export type { ChatLoopOptions, ContextUpdateSnapshot } from './chat.js';
 
 export { compactContext } from './context/compact.js';
 export type { CompactionResult } from './context/compact.js';
@@ -46,6 +49,8 @@ export const AGENT_PACKAGE_VERSION = '0.0.0';
 export * as persistence from './persistence/sessions.js';
 
 export { applyEvent } from './persistence/session-event-handler.js';
+
+export { resumeFromMessages } from './resume.js';
 
 export { createProtocolSession } from './protocol-session.js';
 export type { ProtocolSession, ProtocolSessionOptions } from './protocol-session.js';
