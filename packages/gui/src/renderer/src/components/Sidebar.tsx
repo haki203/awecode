@@ -48,6 +48,8 @@ export function Sidebar({ sessions, activeId, onSelect, onNew, onDelete, onRenam
     setEditingId(null);
   }
 
+  const groups = groupByDate(sessions);
+
   return (
     <aside className="sidebar">
       {header}
@@ -61,55 +63,89 @@ export function Sidebar({ sessions, activeId, onSelect, onNew, onDelete, onRenam
         {sessions.length === 0 ? (
           <div className="sidebar-empty">No conversations yet</div>
         ) : (
-          <div className="session-group">
-            {sessions.map((s) => (
-              <div
-                key={s.id}
-                className={`session-row ${activeId === s.id ? 'active' : ''}`}
-                onClick={() => editingId !== s.id && onSelect(s.id)}
-              >
-                {editingId === s.id ? (
-                  <input
-                    className="rename-input"
-                    autoFocus
-                    value={draftTitle}
-                    onChange={(e) => setDraftTitle(e.target.value)}
-                    onBlur={commitRename}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitRename();
-                      if (e.key === 'Escape') setEditingId(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <>
-                    <span
-                      className="session-title"
-                      title={s.title}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        startRename(s);
+          groups.map((g) => (
+            <div className="session-group" key={g.label}>
+              <div className="group-heading">{g.label}</div>
+              {g.items.map((s) => (
+                <div
+                  key={s.id}
+                  className={`session-row ${activeId === s.id ? 'active' : ''}`}
+                  onClick={() => editingId !== s.id && onSelect(s.id)}
+                >
+                  {editingId === s.id ? (
+                    <input
+                      className="rename-input"
+                      autoFocus
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') setEditingId(null);
                       }}
-                    >
-                      {s.title}
-                    </span>
-                    <button
-                      className="btn-delete"
-                      title="Delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Delete "${s.title}"?`)) onDelete(s.id);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <>
+                      <span
+                        className="session-title"
+                        title={s.title}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          startRename(s);
+                        }}
+                      >
+                        {s.title}
+                      </span>
+                      <button
+                        className="btn-delete"
+                        title="Delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete "${s.title}"?`)) onDelete(s.id);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))
         )}
       </div>
     </aside>
   );
+}
+
+/**
+ * Bucket sessions by relative date of their `updatedAt` timestamp.
+ * Groups: Today, Yesterday, This week, Older. Empty buckets are dropped.
+ * Caller is expected to pre-sort by updatedAt desc; we preserve that order
+ * within each bucket.
+ */
+function groupByDate(sessions: SessionMeta[]): { label: string; items: SessionMeta[] }[] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 86_400_000;
+  const startOfWeek = startOfToday - 6 * 86_400_000;
+
+  const buckets: Record<string, SessionMeta[]> = {
+    Today: [],
+    Yesterday: [],
+    'This week': [],
+    Older: [],
+  };
+
+  for (const s of sessions) {
+    if (s.updatedAt >= startOfToday) buckets.Today!.push(s);
+    else if (s.updatedAt >= startOfYesterday) buckets.Yesterday!.push(s);
+    else if (s.updatedAt >= startOfWeek) buckets['This week']!.push(s);
+    else buckets.Older!.push(s);
+  }
+
+  return Object.entries(buckets)
+    .filter(([, items]) => items.length > 0)
+    .map(([label, items]) => ({ label, items }));
 }
