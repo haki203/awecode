@@ -30,7 +30,7 @@ export function App() {
       if ('vibrate' in navigator) navigator.vibrate(50);
     });
     return off;
-  }, [agent, notifications]);
+  }, [agent.onDone, notifications.notifyDone]);
 
   return (
     <ErrorBoundary>
