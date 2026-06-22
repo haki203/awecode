@@ -84,6 +84,16 @@ each owning its own worktree.
 
 ---
 
+## Mobile access (PWA)
+
+Run `awecode open web` on your computer. The terminal prints a QR code; scan it with your phone to open the web UI (URL includes a bearer token). Add to your home screen to install as a PWA.
+
+The phone must be on the same network as the computer. The agent keeps running on the computer — the phone is a thin client.
+
+See [docs/adr/0008-mobile-client-pwa-not-native.md](docs/adr/0008-mobile-client-pwa-not-native.md) for why we chose PWA over a native app.
+
+---
+
 ## Architecture
 
 ```
