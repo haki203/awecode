@@ -43,6 +43,15 @@ const api = {
       ipcRenderer.off('session:loaded', handler);
     };
   },
+  onSessionUpdated: (
+    cb: (meta: SessionMeta) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, meta: SessionMeta): void => cb(meta);
+    ipcRenderer.on('session:updated', handler);
+    return () => {
+      ipcRenderer.off('session:updated', handler);
+    };
+  },
   listSessions: (): Promise<SessionMeta[]> => ipcRenderer.invoke('session:list'),
   newSession: (): Promise<SessionMeta | null> => ipcRenderer.invoke('session:new'),
   openSession: (id: string): Promise<SessionMeta | null> =>

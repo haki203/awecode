@@ -30,9 +30,9 @@ export interface UseSessions {
  * Used by both Desktop (via TransportContext's electronClient) and Web
  * (via apiClient).
  *
- * Polls every 30 seconds while the document is visible; pauses when hidden
- * to save energy. Always refreshes immediately on user actions (open,
- * remove, rename).
+ * Desktop refreshes event-driven via `onSessionUpdated` (no polling); Web
+ * falls back to a one-shot refresh on mount and after user actions, plus a
+ * refresh when the tab becomes visible again.
  */
 export function useSessions(client: TransportClient): UseSessions {
   const [list, setList] = useState<SessionMeta[]>([]);
@@ -48,21 +48,38 @@ export function useSessions(client: TransportClient): UseSessions {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // Event-driven refresh: when the main process saves a session, it emits
+  // `session:updated` with the fresh metadata. We patch the matching item
+  // in the list in place (no full refetch needed). Falls back to no-op when
+  // the transport doesn't implement onSessionUpdated (Web).
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const update = () => {
-      if (document.hidden) {
-        if (timer) { clearInterval(timer); timer = null; }
-      } else {
-        void refresh();
-        timer = setInterval(() => void refresh(), 30_000);
-      }
+    if (!client.onSessionUpdated) return;
+    const off = client.onSessionUpdated((meta) => {
+      setList((prev) => {
+        const idx = prev.findIndex((s) => s.id === meta.id);
+        if (idx === -1) {
+          // New session (first save after creation) — prepend.
+          return [meta, ...prev];
+        }
+        const next = [...prev];
+        next[idx] = meta;
+        // Re-sort by updatedAt descending so recent sessions bubble up.
+        return next.sort((a, b) => b.updatedAt - a.updatedAt);
+      });
+    });
+    return off;
+  }, [client]);
+
+  // Visibility-based refresh: when the user returns to the tab after
+  // switching away, do a one-shot refresh to catch up on anything missed.
+  // This replaces the old 30s poll — we don't poll on a timer anymore.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden) void refresh();
     };
-    update();
-    document.addEventListener('visibilitychange', update);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      document.removeEventListener('visibilitychange', update);
-      if (timer) clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [refresh]);
 

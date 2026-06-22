@@ -32,6 +32,16 @@ import type { Session } from '../../../shared/protocol.js';
 export const electronClient: TransportClient = {
   send: (cmd) => window.awecode.send(cmd),
   onEvent: (cb) => window.awecode.onEvent(cb),
+  /**
+   * Desktop IPC is always connected (same process), so we report 'open'
+   * forever. This keeps the shared TransportClient contract uniform with
+   * the Web transport, which does have real connect/close transitions.
+   */
+  onStatus: (cb) => {
+    cb('open');
+    return () => { /* no-op */ };
+  },
+  getStatus: () => 'open',
   listSessions: () => window.awecode.listSessions(),
   getSession: async (id) => {
     const meta = await window.awecode.openSession(id);
@@ -45,4 +55,5 @@ export const electronClient: TransportClient = {
   },
   deleteSession: (id) => window.awecode.deleteSession(id),
   renameSession: (id, title) => window.awecode.renameSession(id, title),
+  onSessionUpdated: (cb) => window.awecode.onSessionUpdated(cb),
 };

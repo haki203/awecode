@@ -28,11 +28,30 @@ import type {
 export interface TransportClient {
   send(cmd: GuiClientCommand): Promise<void>;
   onEvent(cb: (ev: GuiAgentEvent) => void): () => void;
+  /**
+   * Subscribe to connection status changes. The callback is fired once
+   * immediately on subscribe (with the current status) and thereafter on
+   * every transition. Returns an unsubscribe function.
+   *
+   * Desktop's IPC shim is always 'open'; the Web WebSocket transport
+   * reports 'connecting' | 'open' | 'closed'.
+   */
+  onStatus(cb: (status: TransportStatus) => void): () => void;
+  getStatus(): TransportStatus;
   listSessions(): Promise<SessionMeta[]>;
   getSession(id: string): Promise<Session | null>;
   deleteSession(id: string): Promise<boolean>;
   renameSession(id: string, title: string): Promise<SessionMeta | null>;
+  /**
+   * Event-driven session metadata update (Desktop-only). Fired whenever the
+   * main process saves a session — lets the sidebar refresh timestamps and
+   * titles instantly without polling. Optional: Web transport returns a
+   * no-op unsubscribe since the WS bridge doesn't emit per-save events.
+   */
+  onSessionUpdated?(cb: (meta: SessionMeta) => void): () => void;
 }
+
+export type TransportStatus = 'connecting' | 'open' | 'closed';
 
 export const TransportContext = createContext<TransportClient | null>(null);
 

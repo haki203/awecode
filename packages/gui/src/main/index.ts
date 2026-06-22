@@ -237,6 +237,8 @@ class AgentBridge {
     if (!this.session) return;
     applyEvent(this.session, ev);
     saveSession(this.session);
+    // Notify the renderer so the sidebar updates the timestamp/title without polling.
+    this.win?.webContents.send('session:updated', stripMessages(this.session));
   }
 
   /**
