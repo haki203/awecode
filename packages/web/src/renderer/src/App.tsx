@@ -18,6 +18,16 @@ import { PwaInstallPrompt } from './components/PwaInstallPrompt.js';
 import { useNotifications } from './hooks/useNotifications.js';
 
 export function App() {
+  return (
+    <ErrorBoundary>
+      <TransportContext.Provider value={apiClient as unknown as TransportClient}>
+        <AppInner />
+      </TransportContext.Provider>
+    </ErrorBoundary>
+  );
+}
+
+function AppInner() {
   const agent = useAgent();
   const sessions = useSessions(apiClient as unknown as TransportClient);
   const notifications = useNotifications();
@@ -33,9 +43,8 @@ export function App() {
   }, [agent.onDone, notifications.notifyDone]);
 
   return (
-    <ErrorBoundary>
-      <TransportContext.Provider value={apiClient as unknown as TransportClient}>
-        <div className="app-shell">
+    <>
+      <div className="app-shell">
           <MenuToggle open={sidebarOpen} onClick={() => setSidebarOpen((v) => !v)} />
           <SidebarDrawer open={sidebarOpen} onClose={() => setSidebarOpen(false)}>
             <Sidebar
@@ -83,8 +92,7 @@ export function App() {
             />
           </main>
           <PwaInstallPrompt />
-        </div>
-      </TransportContext.Provider>
-    </ErrorBoundary>
+      </div>
+    </>
   );
 }

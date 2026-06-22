@@ -25,6 +25,16 @@ import { TransportContext } from './transport/context.js';
 import { electronClient } from './transport/electron-client.js';
 
 export function App() {
+  return (
+    <ErrorBoundary>
+      <TransportContext.Provider value={electronClient}>
+        <AppInner />
+      </TransportContext.Provider>
+    </ErrorBoundary>
+  );
+}
+
+function AppInner() {
   const agent = useAgent();
   const [showContext, setShowContext] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -67,51 +77,47 @@ export function App() {
   );
 
   return (
-    <ErrorBoundary>
-      <TransportContext.Provider value={electronClient}>
-        <div className="app-shell">
-          <WorkspaceSidebar
-            activeSessionId={activeSessionId}
-            onSelectSession={handleSelect}
-            onNewSession={handleNew}
-          />
-          <main className="app-main">
-            {agent.workflow && <WorkflowIndicator name={agent.workflow.name} />}
-            <div className="app-body">
-              {showContext ? (
-                <ContextPanel
-                  entries={agent.context.entries}
-                  totalTokens={agent.context.totalTokens}
-                  budgetTokens={agent.context.budgetTokens}
-                  onClose={() => setShowContext(false)}
-                />
-              ) : (
-                <ChatView
-                  messages={agent.messages}
-                  isStreaming={agent.isStreaming}
-                />
-              )}
-            </div>
-            {!showContext && (
-              <PromptInput
-                disabled={agent.isStreaming}
-                onSubmit={(v) => agent.send(v)}
-                onAbort={agent.abort}
-                isStreaming={agent.isStreaming}
-              />
-            )}
-            <StatusBar
-              model={agent.status.model}
-              cwd={agent.status.cwd ?? currentCwd}
-              usedTokens={agent.context.totalTokens}
+    <div className="app-shell">
+      <WorkspaceSidebar
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelect}
+        onNewSession={handleNew}
+      />
+      <main className="app-main">
+        {agent.workflow && <WorkflowIndicator name={agent.workflow.name} />}
+        <div className="app-body">
+          {showContext ? (
+            <ContextPanel
+              entries={agent.context.entries}
+              totalTokens={agent.context.totalTokens}
               budgetTokens={agent.context.budgetTokens}
-              isStreaming={agent.isStreaming}
-              showContext={showContext}
-              onToggleContext={() => setShowContext((v) => !v)}
+              onClose={() => setShowContext(false)}
             />
-          </main>
+          ) : (
+            <ChatView
+              messages={agent.messages}
+              isStreaming={agent.isStreaming}
+            />
+          )}
         </div>
-      </TransportContext.Provider>
-    </ErrorBoundary>
+        {!showContext && (
+          <PromptInput
+            disabled={agent.isStreaming}
+            onSubmit={(v) => agent.send(v)}
+            onAbort={agent.abort}
+            isStreaming={agent.isStreaming}
+          />
+        )}
+        <StatusBar
+          model={agent.status.model}
+          cwd={agent.status.cwd ?? currentCwd}
+          usedTokens={agent.context.totalTokens}
+          budgetTokens={agent.context.budgetTokens}
+          isStreaming={agent.isStreaming}
+          showContext={showContext}
+          onToggleContext={() => setShowContext((v) => !v)}
+        />
+      </main>
+    </div>
   );
 }
