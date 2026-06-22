@@ -102,6 +102,17 @@ function AppInner() {
                   <span>Viewing past session · </span>
                   <button
                     onClick={() => {
+                      // Reset transcript/state so the old live session's
+                      // messages don't bleed into the resumed session, then
+                      // seed the transcript from the persisted messages so
+                      // the user immediately sees their prior conversation.
+                      agent.resetForSession();
+                      agent.loadMessages(
+                        viewing.messages.map((m) => ({
+                          role: m.role,
+                          content: m.content,
+                        })),
+                      );
                       apiClient.resume(viewing.id);
                       setViewing(null);
                     }}

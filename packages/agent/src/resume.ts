@@ -36,6 +36,11 @@ import type { SessionMessage } from './persistence/sessions.js';
  */
 export function resumeFromMessages(msgs: SessionMessage[]): ModelMessage[] {
   const out: ModelMessage[] = [];
+  // Track which result-message indices have already been consumed by an
+  // earlier marker. Needed for parallel tool calls where markers appear
+  // before results (e.g. [markerA, markerB, resultA, resultB]) — we walk
+  // linearly and must not re-emit a result as a stray tool message.
+  const consumed = new Set<number>();
   let i = 0;
   while (i < msgs.length) {
     const m = msgs[i]!;
@@ -49,8 +54,13 @@ export function resumeFromMessages(msgs: SessionMessage[]): ModelMessage[] {
       continue;
     }
     // role === 'tool'
+    if (consumed.has(i)) {
+      // Already folded into a prior marker's ToolModelMessage — skip.
+      i++;
+      continue;
+    }
     if (isToolCallMarker(m)) {
-      const result = findMatchingResult(msgs, i, m);
+      const result = findMatchingResult(msgs, i, m, consumed);
       if (!result) {
         // Incomplete turn — skip the marker entirely.
         i++;
@@ -69,11 +79,15 @@ export function resumeFromMessages(msgs: SessionMessage[]): ModelMessage[] {
           },
         ],
       });
-      // Advance past both the marker and the matched result.
-      i = (result.index ?? i) + 1;
+      if (result.index !== undefined) {
+        consumed.add(result.index);
+      }
+      // Always advance by 1 — parallel markers sit between this marker and
+      // its result, and they must be visited on subsequent iterations.
+      i++;
       continue;
     }
-    // A tool result with no preceding marker (malformed) — skip.
+    // A tool result with no preceding marker (malformed or orphan) — skip.
     i++;
   }
   return out;
@@ -93,21 +107,28 @@ function findMatchingResult(
   msgs: SessionMessage[],
   markerIdx: number,
   marker: SessionMessage,
+  consumed: Set<number>,
 ): { content: string; index?: number } | null {
-  // Prefer correlation via toolCallId.
+  // Prefer correlation via toolCallId. Scan past other markers and non-
+  // matching results — parallel tool calls can produce sequences like
+  // [markerA, markerB, resultA, resultB] where the result is NOT the
+  // immediately-following message. Skip any index already consumed by a
+  // prior marker so we don't double-emit the same result.
   if (marker.toolCallId) {
     for (let j = markerIdx + 1; j < msgs.length; j++) {
+      if (consumed.has(j)) continue;
       const candidate = msgs[j]!;
-      if (candidate.role !== 'tool') break; // result must immediately follow
-      if (isToolCallMarker(candidate)) break;
+      if (candidate.role !== 'tool') continue;
       if (candidate.toolCallId === marker.toolCallId) {
         return { content: candidate.content, index: j };
       }
     }
     return null;
   }
-  // Legacy fallback: take the next non-marker tool message.
-  if (markerIdx + 1 < msgs.length) {
+  // Legacy fallback: take the next non-marker tool message. Only the
+  // heuristic path requires immediate adjacency — the toolCallId path
+  // above handles correlation correctly across gaps.
+  if (markerIdx + 1 < msgs.length && !consumed.has(markerIdx + 1)) {
     const next = msgs[markerIdx + 1]!;
     if (next.role === 'tool' && !isToolCallMarker(next)) {
       return { content: next.content, index: markerIdx + 1 };

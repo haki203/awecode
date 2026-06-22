@@ -100,4 +100,34 @@ describe('resumeFromMessages', () => {
     expect(out).toHaveLength(2);
     expect(out[1]!.role).toBe('tool');
   });
+
+  it('handles parallel tool calls (markers before results, interleaved)', () => {
+    // AI SDK can emit parallel tool calls: [markerA, markerB, resultA, resultB].
+    // Both pairs must be correctly correlated via toolCallId, even though
+    // neither result immediately follows its marker.
+    const msgs: SessionMessage[] = [
+      { role: 'user', content: 'parallel', ts: 1 },
+      { role: 'tool', content: 'call read_file', ts: 2, toolCallId: 'a', toolName: 'read_file' },
+      { role: 'tool', content: 'call shell_exec', ts: 3, toolCallId: 'b', toolName: 'shell_exec' },
+      { role: 'tool', content: 'resultA', ts: 4, toolCallId: 'a', toolName: 'read_file' },
+      { role: 'tool', content: 'resultB', ts: 5, toolCallId: 'b', toolName: 'shell_exec' },
+      { role: 'assistant', content: 'done', ts: 6 },
+    ];
+    const out = resumeFromMessages(msgs);
+    // Expect: user, toolA, toolB, assistant
+    expect(out).toHaveLength(4);
+    expect(out.filter((m) => m.role === 'tool')).toHaveLength(2);
+    const toolMessages = out.filter((m) => m.role === 'tool') as Array<{
+      role: 'tool';
+      content: Array<{ toolCallId: string; toolName: string; output: { value: string } }>;
+    }>;
+    // toolA: read_file with resultA
+    expect(toolMessages[0]!.content[0]!.toolCallId).toBe('a');
+    expect(toolMessages[0]!.content[0]!.toolName).toBe('read_file');
+    expect(toolMessages[0]!.content[0]!.output.value).toBe('resultA');
+    // toolB: shell_exec with resultB
+    expect(toolMessages[1]!.content[0]!.toolCallId).toBe('b');
+    expect(toolMessages[1]!.content[0]!.toolName).toBe('shell_exec');
+    expect(toolMessages[1]!.content[0]!.output.value).toBe('resultB');
+  });
 });
