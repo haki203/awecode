@@ -203,6 +203,8 @@ async function runInternalProtocolServer(): Promise<void> {
     }
     if (cmd.type === 'prompt') {
       void session.handlePrompt(cmd.text);
+    } else if (cmd.type === 'resume') {
+      session.resume(cmd.messages);
     }
   });
 }

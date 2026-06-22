@@ -19,7 +19,8 @@ import { dirname, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { applyEvent } from '@awecode/agent';
+import { applyEvent, resumeFromMessages } from '@awecode/agent';
+import type { ModelMessage } from 'ai';
 import type { GuiAgentEvent, GuiClientCommand } from '../shared/protocol.js';
 import {
   type Session,
@@ -115,6 +116,12 @@ class AgentBridge {
    */
   private session: Session | null = null;
   /**
+   * Messages to push into the child agent process once it's ready.
+   * Populated by switchTo() when reopening a session; cleared after the
+   * resume command is written to stdin.
+   */
+  private pendingResume: ModelMessage[] | null = null;
+  /**
    * Workspace the agent currently operates in. Read from the workspace
    * store at startup, mutated when the user picks a different folder.
    * Drives the child process's cwd.
@@ -144,6 +151,7 @@ class AgentBridge {
    */
   switchWorkspace(newCwd: string): void {
     this.cwd = newCwd;
+    this.pendingResume = null;
     this.dispose();
     this.session = null;
     this.start();
@@ -207,6 +215,16 @@ class AgentBridge {
     // Tell the renderer which session it's bound to so it can reset its
     // transcript and show the right title.
     this.emitSessionLoaded();
+
+    // If we're resuming a persisted session, push its transcript into the
+    // fresh child via the 'resume' protocol command. The child's
+    // ProtocolSession seeds its liveMessages so the next prompt sees the
+    // full prior context.
+    if (this.pendingResume && this.pendingResume.length > 0) {
+      const cmd: GuiClientCommand = { type: 'resume', messages: this.pendingResume };
+      this.child?.stdin.write(JSON.stringify(cmd) + '\n');
+      this.pendingResume = null;
+    }
   }
 
   /**
@@ -230,12 +248,17 @@ class AgentBridge {
     if (!loaded) return null;
     this.dispose();
     this.session = loaded;
+    // Transform the persisted transcript into ModelMessage[] for the
+    // fresh child process. Stored on pendingResume and flushed in start()
+    // once the new child's stdin is alive.
+    this.pendingResume = resumeFromMessages(loaded.messages);
     this.start();
     return stripMessages(loaded);
   }
 
   /** Start a brand new session (sidebar "New chat" button). */
   newSession(): void {
+    this.pendingResume = null;
     this.dispose();
     this.session = null;
     this.start();
