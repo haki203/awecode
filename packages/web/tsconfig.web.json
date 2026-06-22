@@ -6,7 +6,11 @@
     "moduleResolution": "Bundler",
     "types": ["vite/client"],
     "jsx": "react-jsx",
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@awecode/gui/renderer/src/*": ["../gui/src/renderer/src/*"],
+      "@awecode/gui/shared/*": ["../gui/src/shared/*"]
+    }
   },
   "include": ["src/renderer/**/*", "tests/renderer/**/*"]
 }
