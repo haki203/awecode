@@ -17,6 +17,34 @@ import type { Session, SessionMessage } from './sessions.js';
 import { DEFAULT_TITLE, deriveTitle } from './sessions.js';
 
 /**
+ * Find the most recent tool-call marker message that doesn't yet have a
+ * following tool-result message correlated to it. Used to pair a tool_call
+ * event with the subsequent tool-result content message so they share a
+ * `toolCallId` when persisted.
+ *
+ * A tool-call marker is a tool message with `toolName` set. A subsequent
+ * tool message sharing the same `toolCallId` marks it as matched.
+ */
+function findUnmatchedToolCall(
+  messages: SessionMessage[],
+): { toolCallId: string; toolName: string } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (!m.toolName || !m.toolCallId) continue;
+    // Check if any later message shares this toolCallId — if so, it's matched.
+    let matched = false;
+    for (let j = i + 1; j < messages.length; j++) {
+      if (messages[j]!.toolCallId === m.toolCallId) {
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) return { toolCallId: m.toolCallId, toolName: m.toolName };
+  }
+  return null;
+}
+
+/**
  * Fold one agent event into a Session record. Mutates `session` in place.
  *
  * Pure with respect to I/O — does not write to disk itself. Callers should
@@ -45,6 +73,15 @@ export function applyEvent(session: Session, ev: GuiAgentEvent): void {
         content: ev.content,
         ts: now,
       };
+      // If this is a tool-result message, correlate it with the most
+      // recent tool_call that hasn't been matched yet.
+      if (ev.role === 'tool') {
+        const lastUnmatched = findUnmatchedToolCall(session.messages);
+        if (lastUnmatched) {
+          msg.toolCallId = lastUnmatched.toolCallId;
+          msg.toolName = lastUnmatched.toolName;
+        }
+      }
       session.messages.push(msg);
       // Promote "New chat" to a real title only on the first user turn.
       // Keep user-renamed titles intact.
@@ -62,13 +99,23 @@ export function applyEvent(session: Session, ev: GuiAgentEvent): void {
       }
       break;
     }
-    case 'tool_call':
+    case 'tool_call': {
+      // Generate a stable id from session state alone so the fold stays pure.
+      // Count existing tool_call markers (messages carrying a toolName) and
+      // use that as the index — id stays the same even if the result message
+      // hasn't arrived yet, and the following tool message reuses it via
+      // findUnmatchedToolCall.
+      const idx = session.messages.filter((m) => m.toolName).length;
+      const toolCallId = `call-${idx}-${ev.name}`;
       session.messages.push({
         role: 'tool',
         content: `call ${ev.name}`,
         ts: now,
+        toolCallId,
+        toolName: ev.name,
       });
       break;
+    }
     case 'done':
       // No state change; callers use this for streaming UI bookkeeping.
       break;

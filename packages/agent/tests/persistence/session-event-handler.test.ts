@@ -118,4 +118,33 @@ describe('applyEvent', () => {
     // After deriveTitle: **markdown** → markdown, newlines → spaces, first sentence (no period → no split)
     expect(s.title).toBe('Line one Line two with markdown');
   });
+
+  it('tool_call records toolCallId and toolName', () => {
+    const s: Session = { ...emptySession, messages: [] };
+    applyEvent(s, { type: 'tool_call', name: 'read_file' });
+    expect(s.messages).toHaveLength(1);
+    expect(s.messages[0]!.toolName).toBe('read_file');
+    expect(s.messages[0]!.toolCallId).toBeTruthy();
+    expect(s.messages[0]!.content).toContain('read_file');
+  });
+
+  it('correlates a tool_call with the following tool-result message via toolCallId', () => {
+    const s: Session = { ...emptySession, messages: [] };
+    applyEvent(s, { type: 'tool_call', name: 'read_file' });
+    applyEvent(s, { type: 'message', role: 'tool', content: '{"lines":[]}' });
+    expect(s.messages).toHaveLength(2);
+    expect(s.messages[0]!.toolCallId).toBe(s.messages[1]!.toolCallId);
+    expect(s.messages[1]!.toolName).toBe('read_file');
+  });
+
+  it('assigns distinct toolCallIds to two sequential tool calls', () => {
+    const s: Session = { ...emptySession, messages: [] };
+    applyEvent(s, { type: 'tool_call', name: 'read_file' });
+    applyEvent(s, { type: 'message', role: 'tool', content: 'result1' });
+    applyEvent(s, { type: 'tool_call', name: 'shell_exec' });
+    applyEvent(s, { type: 'message', role: 'tool', content: 'result2' });
+    expect(s.messages[0]!.toolCallId).not.toBe(s.messages[2]!.toolCallId);
+    expect(s.messages[0]!.toolCallId).toBe(s.messages[1]!.toolCallId);
+    expect(s.messages[2]!.toolCallId).toBe(s.messages[3]!.toolCallId);
+  });
 });
