@@ -159,6 +159,37 @@ export const DEFAULT_TITLE = 'New chat';
 export function deriveTitle(messages: SessionMessage[]): string {
   const first = messages.find((m) => m.role === 'user');
   if (!first) return DEFAULT_TITLE;
-  const t = first.content.trim().replace(/\s+/g, ' ');
-  return t.length > 60 ? `${t.slice(0, 57)}…` : t;
+
+  let t = first.content;
+
+  // Drop fenced code blocks entirely (```...```).
+  t = t.replace(/```[\s\S]*?```/g, '');
+
+  // Strip inline code spans (`code`).
+  t = t.replace(/`([^`]+)`/g, '$1');
+
+  // Strip bold (**text**) and italic (*text* / _text_).
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
+  t = t.replace(/(^|[^*])\*([^*]+)\*/g, '$1$2');
+  t = t.replace(/_([^_]+)_/g, '$1');
+
+  // Strip leading @-mentions (e.g. "@agent", "@codex") and slash commands
+  // (e.g. "/compact", "/workflow plan"). Only leading ones — inline @refs
+  // to files are often meaningful content.
+  t = t.replace(/^\s*(?:@[A-Za-z0-9_-]+\s+)*(?:\/[A-Za-z0-9_-]+\s*)+/, '');
+
+  // Collapse whitespace (newlines → spaces) and trim.
+  t = t.replace(/\s+/g, ' ').trim();
+
+  // First sentence only — split on `. ` (period followed by space).
+  // Note: we intentionally do NOT split on `?` or `!` because users often
+  // write rhetorical questions followed by the real ask
+  // (e.g. "why does this fail? pls explain") and splitting there would
+  // drop meaningful context from the title.
+  const sentenceEnd = t.search(/\.\s/);
+  if (sentenceEnd !== -1) t = t.slice(0, sentenceEnd + 1);
+
+  if (!t) return DEFAULT_TITLE;
+
+  return t.length > 50 ? `${t.slice(0, 47)}…` : t;
 }
