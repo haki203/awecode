@@ -45,17 +45,31 @@ export interface ProtocolSessionOptions {
   send: (ev: GuiAgentEvent) => void;
   /** Override for tests; defaults to the real runChatLoop. */
   runChatLoop?: typeof defaultRunChatLoop;
+  /**
+   * Initial conversation transcript to seed the agent with, used when
+   * resuming a persisted session. When provided, `liveMessages` starts as
+   * a copy of this array and each subsequent prompt appends to it rather
+   * than resetting. When omitted, the session starts empty (legacy behavior).
+   */
+  initialMessages?: ModelMessage[];
 }
 
 export interface ProtocolSession {
   handlePrompt(text: string): Promise<void>;
   abort(): void;
   dispose(): void;
+  /**
+   * Seed `liveMessages` with a prior transcript. Idempotent — subsequent
+   * calls append. Used by transports that receive a `resume` command from
+   * the parent after the session has already started (e.g. Desktop
+   * AgentBridge.switchTo sends resume right after spawning the child).
+   */
+  resume(messages: ModelMessage[]): void;
 }
 
 export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSession {
   const runChatLoop = opts.runChatLoop ?? defaultRunChatLoop;
-  let liveMessages: ModelMessage[] = [];
+  let liveMessages: ModelMessage[] = opts.initialMessages ? [...opts.initialMessages] : [];
   let abortController: AbortController | null = null;
   let orchestrator: OrchestratorLike | null = null;
   const queueRef = { current: new ApprovalQueue() };
@@ -97,7 +111,7 @@ export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSes
     if (!trimmed) return;
     emit({ type: 'message', role: 'user', content: trimmed });
 
-    liveMessages = [{ role: 'user', content: trimmed }];
+    liveMessages.push({ role: 'user', content: trimmed });
     abortController = new AbortController();
 
     try {
@@ -148,6 +162,12 @@ export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSes
             emit({ type: 'intent', intent: 'direct', name: null });
           }
         },
+        onContextUpdate: () => {
+          // Mid-turn snapshot so StatusBar / ContextPanel in GUI and Web
+          // update as tokens accumulate, not just once at onDone. This
+          // mirrors the CLI's `setContextVersion` re-render trigger.
+          emit({ type: 'context_snapshot', ...snapshotContext() });
+        },
         onDone: () => {
           emit({ type: 'context_snapshot', ...snapshotContext() });
           emit({ type: 'done' });
@@ -181,5 +201,17 @@ export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSes
     orchestrator = null;
   }
 
-  return { handlePrompt, abort, dispose };
+  function resume(messages: ModelMessage[]): void {
+    for (const m of messages) {
+      // Skip duplicates when the same seed was already provided via
+      // initialMessages or an earlier resume() call. Reference equality
+      // is intentional: callers typically pass the same array instance
+      // (e.g. the loaded SessionMessage[] -> ModelMessage[] transform).
+      if (!liveMessages.some((existing) => existing === m)) {
+        liveMessages.push(m);
+      }
+    }
+  }
+
+  return { handlePrompt, abort, dispose, resume };
 }

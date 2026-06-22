@@ -121,3 +121,122 @@ describe('ProtocolSession', () => {
     expect(events[events.length - 1]!.type).toBe('done');
   });
 });
+
+describe('createProtocolSession with initialMessages', () => {
+  it('seeds liveMessages from initialMessages (no reset on first prompt)', async () => {
+    const initialMessages: ModelMessage[] = [
+      { role: 'user', content: 'previous question' },
+      { role: 'assistant', content: 'previous answer' },
+    ];
+
+    let capturedMessages: ModelMessage[] | null = null;
+    const capturingRunLoop = (msgs: ModelMessage[]): Promise<ModelMessage[]> => {
+      capturedMessages = msgs;
+      return Promise.resolve(msgs);
+    };
+
+    const session = createProtocolSession({
+      config: mockConfig,
+      context: new ContextManager(),
+      cwd: '/x',
+      send: () => {},
+      runChatLoop: capturingRunLoop as any,
+      initialMessages,
+    });
+
+    await session.handlePrompt('follow-up question');
+
+    expect(capturedMessages).not.toBeNull();
+    // Seed (2) + new user prompt (1) = at least 3 entries before runChatLoop returns.
+    expect(capturedMessages!.length).toBeGreaterThanOrEqual(3);
+    expect(capturedMessages!.find((m) => m.role === 'user' && m.content === 'previous question'))
+      .toBeDefined();
+    expect(capturedMessages!.find((m) => m.role === 'assistant' && m.content === 'previous answer'))
+      .toBeDefined();
+    expect(capturedMessages!.find((m) => m.role === 'user' && m.content === 'follow-up question'))
+      .toBeDefined();
+  });
+
+  it('starts with empty liveMessages when initialMessages is omitted', async () => {
+    let capturedMessages: ModelMessage[] | null = null;
+    const capturingRunLoop = (msgs: ModelMessage[]): Promise<ModelMessage[]> => {
+      capturedMessages = msgs;
+      return Promise.resolve(msgs);
+    };
+
+    const session = createProtocolSession({
+      config: mockConfig,
+      context: new ContextManager(),
+      cwd: '/x',
+      send: () => {},
+      runChatLoop: capturingRunLoop as any,
+    });
+
+    await session.handlePrompt('first message');
+
+    expect(capturedMessages).toHaveLength(1);
+    expect(capturedMessages![0]).toEqual({ role: 'user', content: 'first message' });
+  });
+
+  it('resume() method appends messages to liveMessages', async () => {
+    let capturedMessages: ModelMessage[] | null = null;
+    const capturingRunLoop = (msgs: ModelMessage[]): Promise<ModelMessage[]> => {
+      capturedMessages = msgs;
+      return Promise.resolve(msgs);
+    };
+
+    const session = createProtocolSession({
+      config: mockConfig,
+      context: new ContextManager(),
+      cwd: '/x',
+      send: () => {},
+      runChatLoop: capturingRunLoop as any,
+    });
+
+    // Seed via resume() before any prompt
+    session.resume([
+      { role: 'user', content: 'resumed question' },
+      { role: 'assistant', content: 'resumed answer' },
+    ]);
+
+    await session.handlePrompt('new question');
+
+    expect(capturedMessages!.length).toBeGreaterThanOrEqual(3);
+    expect(capturedMessages!.find((m) => m.role === 'user' && m.content === 'resumed question'))
+      .toBeDefined();
+    expect(capturedMessages!.find((m) => m.role === 'assistant' && m.content === 'resumed answer'))
+      .toBeDefined();
+    expect(capturedMessages!.find((m) => m.role === 'user' && m.content === 'new question'))
+      .toBeDefined();
+  });
+
+  it('resume() is idempotent when called with the same seed twice', async () => {
+    let capturedMessages: ModelMessage[] | null = null;
+    const capturingRunLoop = (msgs: ModelMessage[]): Promise<ModelMessage[]> => {
+      capturedMessages = msgs;
+      return Promise.resolve(msgs);
+    };
+
+    const seed: ModelMessage[] = [
+      { role: 'user', content: 'dup question' },
+      { role: 'assistant', content: 'dup answer' },
+    ];
+
+    const session = createProtocolSession({
+      config: mockConfig,
+      context: new ContextManager(),
+      cwd: '/x',
+      send: () => {},
+      runChatLoop: capturingRunLoop as any,
+      initialMessages: seed,
+    });
+
+    // Calling resume() with the same array references should NOT duplicate.
+    session.resume(seed);
+
+    await session.handlePrompt('next');
+
+    // seed (2) + new prompt (1) = 3, NOT 5
+    expect(capturedMessages!.length).toBe(3);
+  });
+});
