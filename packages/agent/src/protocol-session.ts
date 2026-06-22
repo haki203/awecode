@@ -162,12 +162,6 @@ export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSes
             emit({ type: 'intent', intent: 'direct', name: null });
           }
         },
-        onContextUpdate: () => {
-          // Mid-turn snapshot so StatusBar / ContextPanel in GUI and Web
-          // update as tokens accumulate, not just once at onDone. This
-          // mirrors the CLI's `setContextVersion` re-render trigger.
-          emit({ type: 'context_snapshot', ...snapshotContext() });
-        },
         onDone: () => {
           emit({ type: 'context_snapshot', ...snapshotContext() });
           emit({ type: 'done' });
