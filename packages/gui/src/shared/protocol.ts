@@ -47,7 +47,8 @@ export interface ContextEntrySnapshot {
 export type GuiClientCommand =
   | { type: 'prompt'; text: string }
   | { type: 'abort' }
-  | { type: 'exit' };
+  | { type: 'exit' }
+  | { type: 'resume'; messages: import('ai').ModelMessage[] };
 
 // --- Session history (conversation list) -----------------------------------
 
