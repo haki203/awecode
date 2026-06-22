@@ -38,6 +38,7 @@ import {
   setCurrentWorkspace,
   type WorkspaceState,
 } from './workspaces.js';
+import { migrateSessionsDir } from './migration.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -350,6 +351,9 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  // Run one-shot session migration before any session is loaded.
+  migrateSessionsDir();
+
   ipcMain.handle('agent:send', (_e, cmd: GuiClientCommand) => {
     bridge.send(cmd);
   });
