@@ -55,6 +55,9 @@ export interface SessionMessage {
   role: 'user' | 'assistant' | 'tool' | 'error';
   content: string;
   ts: number;
+  toolCallId?: string;
+  toolName?: string;
+  toolCallArgs?: string;
 }
 
 export interface SessionMeta {

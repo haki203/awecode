@@ -33,6 +33,25 @@ export interface SessionMessage {
   role: 'user' | 'assistant' | 'tool' | 'error';
   content: string;
   ts: number;
+  /**
+   * Correlation id linking a tool-call message to its tool-result message.
+   * Required by OpenAI/Anthropic when replaying a transcript back into the
+   * model. Omitted on legacy session JSONs (pre-resume feature); the resume
+   * transform generates synthetic ids for those.
+   */
+  toolCallId?: string;
+  /**
+   * Name of the invoked tool, separate from the human-readable `content`.
+   * Lets the resume transform emit a proper `ToolModelMessage` with a
+   * `toolName` field instead of parsing it out of the content string.
+   */
+  toolName?: string;
+  /**
+   * JSON-serialized arguments the model supplied when invoking the tool.
+   * Stored for debugging and potential future replay needs. Not required
+   * for resume (the result is what matters, not the original args).
+   */
+  toolCallArgs?: string;
 }
 
 export interface SessionMeta {

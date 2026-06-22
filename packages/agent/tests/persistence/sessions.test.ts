@@ -66,4 +66,37 @@ describe('persistence/sessions', () => {
     saveSession({ id: '../../malicious', title: 't', createdAt: 1, updatedAt: 1, cwd: '/x', messages: [] });
     expect(loadSession('../../malicious')).toBeNull();
   });
+
+  it('round-trips a session with extended SessionMessage fields', async () => {
+    const { saveSession, loadSession } = await import('../../src/persistence/sessions.js');
+    const s = {
+      id: 'ext-test',
+      title: 'tools',
+      createdAt: 1,
+      updatedAt: 2,
+      cwd: '/x',
+      messages: [
+        { role: 'user' as const, content: 'read file', ts: 1 },
+        {
+          role: 'tool' as const,
+          content: 'call read_file',
+          ts: 2,
+          toolCallId: 'call_abc',
+          toolName: 'read_file',
+        },
+        {
+          role: 'tool' as const,
+          content: '{"lines":[]}',
+          ts: 3,
+          toolCallId: 'call_abc',
+          toolName: 'read_file',
+        },
+      ],
+    };
+    saveSession(s);
+    const got = loadSession('ext-test');
+    expect(got).toEqual(s);
+    expect(got?.messages[1]?.toolCallId).toBe('call_abc');
+    expect(got?.messages[1]?.toolName).toBe('read_file');
+  });
 });
