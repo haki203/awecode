@@ -65,4 +65,37 @@ describe('deriveTitle', () => {
     const msgs: SessionMessage[] = [{ role: 'user', content: '   hello world   ', ts: 1 }];
     expect(deriveTitle(msgs)).toBe('hello world');
   });
+
+  it('does NOT split on ? or ! (preserves rhetorical questions)', () => {
+    const msgs: SessionMessage[] = [
+      { role: 'user', content: 'why fail? please explain', ts: 1 },
+    ];
+    expect(deriveTitle(msgs)).toBe('why fail? please explain');
+  });
+
+  it('returns DEFAULT_TITLE when content is only whitespace', () => {
+    const msgs: SessionMessage[] = [{ role: 'user', content: '   ', ts: 1 }];
+    expect(deriveTitle(msgs)).toBe(DEFAULT_TITLE);
+  });
+
+  it('returns DEFAULT_TITLE when content is only a code block', () => {
+    const msgs: SessionMessage[] = [
+      { role: 'user', content: '```ts\nconst x = 1;\n```', ts: 1 },
+    ];
+    expect(deriveTitle(msgs)).toBe(DEFAULT_TITLE);
+  });
+
+  it('preserves snake_case identifiers (does not mangle them as italic)', () => {
+    const msgs: SessionMessage[] = [
+      { role: 'user', content: 'fix my_func implementation', ts: 1 },
+    ];
+    expect(deriveTitle(msgs)).toBe('fix my_func implementation');
+  });
+
+  it('strips lone @mention without slash command', () => {
+    const msgs: SessionMessage[] = [
+      { role: 'user', content: '@agent help me debug', ts: 1 },
+    ];
+    expect(deriveTitle(msgs)).toBe('help me debug');
+  });
 });

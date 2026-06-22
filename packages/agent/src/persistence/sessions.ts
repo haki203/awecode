@@ -171,12 +171,13 @@ export function deriveTitle(messages: SessionMessage[]): string {
   // Strip bold (**text**) and italic (*text* / _text_).
   t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
   t = t.replace(/(^|[^*])\*([^*]+)\*/g, '$1$2');
-  t = t.replace(/_([^_]+)_/g, '$1');
+  t = t.replace(/(?<!\w)_([^_]+)_(?!\w)/g, '$1');
 
-  // Strip leading @-mentions (e.g. "@agent", "@codex") and slash commands
-  // (e.g. "/compact", "/workflow plan"). Only leading ones — inline @refs
-  // to files are often meaningful content.
-  t = t.replace(/^\s*(?:@[A-Za-z0-9_-]+\s+)*(?:\/[A-Za-z0-9_-]+\s*)+/, '');
+  // Strip leading @-mentions (e.g. "@agent") and any slash commands
+  // (e.g. "/compact"). The two patterns can appear in any order or
+  // combination at the start of the message. Only leading ones — inline
+  // @refs to files are often meaningful content.
+  t = t.replace(/^\s*(?:@[A-Za-z0-9_-]+\s+)*(?:\/[A-Za-z0-9_-]+\s*)*/, '');
 
   // Collapse whitespace (newlines → spaces) and trim.
   t = t.replace(/\s+/g, ' ').trim();
