@@ -15,8 +15,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { streamText, jsonSchema, type ModelMessage, type ToolSet } from 'ai';
-import { createProvider } from '@awecode/llm';
+import type { ModelMessage } from 'ai';
+import { streamChatWithTools, buildToolSet } from '@awecode/llm';
 import type { AwecodeConfig } from '@awecode/llm';
 import { listToolDefinitions, dispatchTool } from '@awecode/tools';
 import type { ContextManager } from './context/manager.js';
@@ -116,87 +116,11 @@ function loadSystemPrompt(): string {
 
 const SYSTEM_PROMPT = loadSystemPrompt();
 
-/**
- * Vercel AI SDK v6 renames the legacy `parameters` field on a tool to
- * `inputSchema` and types tool registries as `ToolSet`
- * (`Record<string, Tool<...>>`). `ToolDefinition` (from `@awecode/tools`)
- * already carries a JSON-Schema-shaped `parameters` record, so we lift each
- * definition into the SDK's `{ description, inputSchema }` shape and accumulate
- * them into a `ToolSet`. The cast is confined to this single helper — callers
- * pass concrete `ToolDefinition` objects and get back a typed `ToolSet`, so the
- * registry never sees `any` (mirrors the `adaptToolHandler` pattern from
- * `@awecode/tools`).
- *
- * Since AI SDK v6, raw JSON Schema objects passed to `inputSchema` are no
- * longer accepted directly — they must be wrapped with the `jsonSchema()`
- * helper from the `ai` package. Without the wrapper, the SDK's internal
- * `asSchema()` tries to call `.schema()` on the plain object and fails with
- * `TypeError: schema is not a function`. See:
- *   https://ai-sdk.dev/docs/reference/ai-sdk-core/json-schema
- *   https://github.com/vercel/ai/issues/13460
- */
-function buildToolSet(
-  defs: ReturnType<typeof listToolDefinitions>,
-): ToolSet {
-  const acc: Record<string, { description: string; inputSchema: unknown }> = {};
-  for (const def of defs) {
-    acc[def.name] = {
-      description: def.description,
-      inputSchema: jsonSchema(def.parameters),
-    };
-  }
-  return acc as ToolSet;
-}
-
-/**
- * Normalises a tool call coming back from `streamText` into the
- * `{ name, arguments, id }` shape `dispatchTool` expects.
- *
- * AI SDK v6 types tool calls as `TypedToolCall` and carries the model-supplied
- * payload on an `input` field. The brief (and our test mock) use the older
- * `args` spelling, so we read whichever field is present. `toolName` is the
- * SDK's name for the tool identifier in both v5 and v6.
- *
- * `id` preserves the provider-assigned `toolCallId` (v6 `BaseToolCall`).
- * Real providers (OpenAI, Anthropic) require the exact id they emitted for
- * tool-result correlation; when absent (e.g. our mock test), callers fall
- * back to a synthetic id built from the iteration index and tool name.
- */
-interface NormalizedToolCall {
-  name: string;
-  arguments: Record<string, unknown>;
-  id?: string;
-}
-
-function normalizeToolCall(call: {
-  toolName: string;
-  input?: unknown;
-  args?: unknown;
-  toolCallId?: string;
-}): NormalizedToolCall {
-  const raw = ('input' in call && call.input !== undefined)
-    ? call.input
-    : call.args;
-  const args =
-    raw !== null && typeof raw === 'object'
-      ? (raw as Record<string, unknown>)
-      : {};
-  return { name: call.toolName, arguments: args, id: call.toolCallId };
-}
-
 export async function runChatLoop(
   messages: ModelMessage[],
   opts: ChatLoopOptions,
 ): Promise<ModelMessage[]> {
   try {
-    const providerConfig = opts.config.providers[opts.config.activeProvider];
-    if (!providerConfig) {
-      throw new Error(
-        `Active provider "${opts.config.activeProvider}" not found in config`,
-      );
-    }
-    const model = createProvider(providerConfig, opts.modelOverride);
-
     // Seed the shared array with context entries (idempotent — caller may
     // pre-seed). We DON'T copy `messages` — it IS the live ref the caller owns,
     // so any external injection (e.g. from the Orchestrator) naturally appears
@@ -227,41 +151,21 @@ export async function runChatLoop(
     for (let iter = 0; iter < maxIter; iter++) {
       if (opts.abortSignal?.aborted) break;
 
-      // NOTE: real AI SDK v6 `streamText` returns a `StreamTextResult` directly
-      // (not a Promise). The brief's test mock, however, uses
-      // `mockResolvedValueOnce`, so the call yields a Promise. Awaiting a
-      // non-thenable returns the value itself, so `await` works for both the real
-      // API and the Promise-returning mock without diverging code paths.
-      const result = await streamText({
-        model,
+      const result = await streamChatWithTools({
+        config: opts.config,
         messages,
-        system: opts.systemPrompt ?? SYSTEM_PROMPT,
         tools,
+        system: opts.systemPrompt ?? SYSTEM_PROMPT,
         maxOutputTokens: 4096,
         abortSignal: opts.abortSignal,
+        modelOverride: opts.modelOverride,
+        onToken: (chunk) => opts.onToken?.(chunk),
       });
-
-      let assistantText = '';
-      for await (const chunk of result.textStream) {
-        assistantText += chunk;
-        opts.onToken?.(chunk);
-      }
-
-      // Read toolCalls early so the empty-output guard can distinguish a
-      // truly-empty stream (silent failure) from a legitimate tool-only
-      // turn where the model emits no text and jumps straight to a tool
-      // call. Resolving `toolCalls` before the guard is safe — the SDK's
-      // promise only settles after the stream ends.
-      const toolCalls = await result.toolCalls;
+      const { assistantText, toolCalls } = await result.toCompletion();
 
       // Detect an empty stream: the provider returned no assistant text AND
-      // no tool calls. This is the silent-failure root cause — without the
-      // throw, the loop would `break` cleanly at the empty-toolCalls check
-      // below and callers would see a normal "agent done" exit with no UI
-      // output, forcing the user to re-prompt multiple times before any
-      // error surfaced. Throw a stable, repo-owned message rather than
-      // passing through any SDK-internal text so callers can match on it
-      // deterministically.
+      // no tool calls. Throw a stable, repo-owned message so callers can
+      // match on it deterministically.
       if (assistantText === '' && (!toolCalls || toolCalls.length === 0)) {
         const err = new Error(
           'No output generated. Check the stream for errors.',
@@ -300,16 +204,15 @@ export async function runChatLoop(
       }
 
       for (const call of toolCalls) {
-        const normalized = normalizeToolCall(call);
-        opts.onToolCall?.(normalized.name, normalized.arguments);
+        opts.onToolCall?.(call.name, call.arguments);
         const toolResult = await dispatchTool({
-          name: normalized.name,
-          arguments: normalized.arguments,
+          name: call.name,
+          arguments: call.arguments,
         });
-        opts.onToolResult?.(normalized.name, toolResult);
+        opts.onToolResult?.(call.name, toolResult);
         const toolResultStr = JSON.stringify(toolResult);
         opts.context.addToolResult({
-          toolName: normalized.name,
+          toolName: call.name,
           content: toolResultStr,
         });
         fireContextUpdate();
@@ -321,14 +224,14 @@ export async function runChatLoop(
         // Prefer the provider-assigned `toolCallId` (required by OpenAI /
         // Anthropic for correlation); fall back to a synthetic id for the mock
         // test which doesn't supply one.
-        const toolCallId = normalized.id ?? `call-${iter}-${normalized.name}`;
+        const toolCallId = call.id ?? `call-${iter}-${call.name}`;
         messages.push({
           role: 'tool',
           content: [
             {
               type: 'tool-result',
               toolCallId,
-              toolName: normalized.name,
+              toolName: call.name,
               output: { type: 'text', value: toolResultStr },
             },
           ],

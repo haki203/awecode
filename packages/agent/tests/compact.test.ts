@@ -3,16 +3,11 @@ import { compactContext } from '../src/context/compact.js';
 import type { ContextEntry } from '../src/context/entry.js';
 import type { AwecodeConfig } from '@awecode/llm';
 
-vi.mock('ai', () => ({
-  generateText: vi.fn().mockResolvedValue({
-    text: '## Summary\n\nTask: fix bug\nDecisions: use approach X',
-    usage: { promptTokens: 100, completionTokens: 30 },
-  }),
-  jsonSchema: (schema: unknown) => schema,
-}));
-
 vi.mock('@awecode/llm', () => ({
-  createProvider: vi.fn(() => ({})),
+  chat: vi.fn().mockResolvedValue({
+    text: '## Summary\n\nTask: fix bug\nDecisions: use approach X',
+    usage: { promptTokens: 100, completionTokens: 30, totalTokens: 130 },
+  }),
 }));
 
 const mockConfig: AwecodeConfig = {

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { generateText } from 'ai';
-import { createProvider } from '@awecode/llm';
+import { chat } from '@awecode/llm';
 import type { AwecodeConfig } from '@awecode/llm';
 import { countTokens } from 'gpt-tokenizer';
 import type { ContextEntry } from './entry.js';
@@ -42,10 +41,6 @@ export async function compactContext(
   entries: ContextEntry[],
   recentTurns: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<CompactionResult> {
-  const providerConfig = config.providers[config.activeProvider];
-  if (!providerConfig) throw new Error('No active provider');
-
-  const model = createProvider(providerConfig);
   const beforeTokens = entries.reduce((s, e) => s + e.tokens, 0);
 
   const conversationText = entries.map((e) => e.content).join('\n\n');
@@ -53,12 +48,23 @@ export async function compactContext(
     .map((t) => `${t.role}: ${t.content}`)
     .join('\n');
 
-  const result = await generateText({
-    model,
-    system: SUMMARIZATION_PROMPT,
-    prompt: `Conversation to summarize:\n\n${conversationText}\n\n--- Recent turns ---\n${recentText}`,
-    maxOutputTokens: 2048,
-  });
+  // chat() from @awecode/llm wraps generateText and resolves the provider
+  // internally. The summarization prompt is the system; the conversation
+  // to summarize is folded into a single user message (chat() takes no
+  // standalone `prompt` field).
+  const result = await chat(
+    config,
+    [
+      {
+        role: 'user',
+        content: `Conversation to summarize:\n\n${conversationText}\n\n--- Recent turns ---\n${recentText}`,
+      },
+    ],
+    {
+      systemPrompt: SUMMARIZATION_PROMPT,
+      maxTokens: 2048,
+    },
+  );
 
   const afterTokens = countTokens(result.text);
   return {

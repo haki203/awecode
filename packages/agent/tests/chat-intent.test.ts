@@ -17,15 +17,45 @@ import { runChatLoop } from '../src/chat.js';
 import { ContextManager } from '../src/context/manager.js';
 import type { AwecodeConfig } from '@awecode/llm';
 
-vi.mock('@awecode/llm', () => ({
-  createProvider: vi.fn(() => ({})),
-}));
+// After the cutover, agent imports streamChatWithTools from @awecode/llm
+// (not streamText from 'ai'). Mock it with a controllable implementation.
+const mockStreamChatWithTools = vi.fn();
+vi.mock('@awecode/llm', async () => {
+  const actual = await vi.importActual<typeof import('@awecode/llm')>('@awecode/llm');
+  return {
+    ...actual,
+    // Faithful to the real streamChatWithTools, which fires onToken from its
+    // closure as toCompletion() drains the stream. Capture onToken from the
+    // call opts and re-emit per character so a streaming assertion
+    // (tokens.join('') === text) keeps passing — matches chat.test.ts.
+    streamChatWithTools: async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { onToken?: (chunk: string) => void };
+      const result = (await mockStreamChatWithTools(...args)) as {
+        textStream: AsyncIterable<string>;
+        toCompletion: () => Promise<{ assistantText: string; toolCalls: unknown[] }>;
+      };
+      const orig = result.toCompletion.bind(result);
+      result.toCompletion = async () => {
+        const out = await orig();
+        for (const ch of out.assistantText) opts.onToken?.(ch);
+        return out;
+      };
+      return result;
+    },
+  };
+});
 
-const mockStreamText = vi.fn();
-vi.mock('ai', () => ({
-  streamText: (...args: unknown[]) => mockStreamText(...args),
-  jsonSchema: (schema: unknown) => schema,
-}));
+function makeStreamResult(text: string) {
+  return {
+    textStream: (async function* () {
+      for (const ch of text) yield ch;
+    })(),
+    toCompletion: async () => ({
+      assistantText: text,
+      toolCalls: [],
+    }),
+  };
+}
 
 const mockConfig: AwecodeConfig = {
   activeProvider: 'mock',
@@ -34,19 +64,10 @@ const mockConfig: AwecodeConfig = {
   },
 };
 
-function makeStreamResponse(text: string) {
-  return {
-    textStream: (async function* () {
-      for (const ch of text) yield ch;
-    })(),
-    toolCalls: Promise.resolve([]),
-  };
-}
-
 describe('chat loop Intent Declaration', () => {
   it('fires onIntentDeclared when agent emits start_workflow', async () => {
-    mockStreamText.mockResolvedValueOnce(
-      makeStreamResponse('I will start_workflow("brainstorm") for this task.'),
+    mockStreamChatWithTools.mockResolvedValueOnce(
+      makeStreamResult('I will start_workflow("brainstorm") for this task.'),
     );
 
     const ctx = new ContextManager();
@@ -63,7 +84,7 @@ describe('chat loop Intent Declaration', () => {
   });
 
   it('fires onIntentDeclared with direct mode when no workflow', async () => {
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Fixed the typo.'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Fixed the typo.'));
 
     const ctx = new ContextManager();
     let intentType: string | null = null;

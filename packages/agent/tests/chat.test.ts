@@ -17,19 +17,33 @@ import { runChatLoop } from '../src/chat.js';
 import { ContextManager } from '../src/context/manager.js';
 import type { AwecodeConfig } from '@awecode/llm';
 
-// Mock @awecode/llm
-vi.mock('@awecode/llm', () => ({
-  createProvider: vi.fn(() => ({})), // opaque model object
-}));
-
-// Mock ai (Vercel AI SDK)
-const mockStreamText = vi.fn();
-vi.mock('ai', () => ({
-  streamText: (...args: unknown[]) => mockStreamText(...args),
-  // Identity wrapper so buildToolSet's jsonSchema() call returns the
-  // raw schema unchanged — tests don't assert on tool schema shape.
-  jsonSchema: (schema: unknown) => schema,
-}));
+// After the cutover, agent imports streamChatWithTools from @awecode/llm
+// (not streamText from 'ai'). Mock it with a controllable implementation.
+const mockStreamChatWithTools = vi.fn();
+vi.mock('@awecode/llm', async () => {
+  const actual = await vi.importActual<typeof import('@awecode/llm')>('@awecode/llm');
+  return {
+    ...actual,
+    // Faithful to the real streamChatWithTools, which fires onToken from its
+    // closure as toCompletion() drains the stream. Capture onToken from the
+    // call opts and re-emit per character so the streaming assertion
+    // (tokens.join('') === text) keeps passing.
+    streamChatWithTools: async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { onToken?: (chunk: string) => void };
+      const result = (await mockStreamChatWithTools(...args)) as {
+        textStream: AsyncIterable<string>;
+        toCompletion: () => Promise<{ assistantText: string; toolCalls: unknown[] }>;
+      };
+      const orig = result.toCompletion.bind(result);
+      result.toCompletion = async () => {
+        const out = await orig();
+        for (const ch of out.assistantText) opts.onToken?.(ch);
+        return out;
+      };
+      return result;
+    },
+  };
+});
 
 const mockConfig: AwecodeConfig = {
   activeProvider: 'mock',
@@ -42,18 +56,25 @@ const mockConfig: AwecodeConfig = {
   },
 };
 
-function makeStreamResponse(text: string, toolCalls: unknown[] = []) {
+function makeStreamResult(text: string, toolCalls: unknown[] = []) {
   return {
     textStream: (async function* () {
       for (const ch of text) yield ch;
     })(),
-    toolCalls: Promise.resolve(toolCalls),
+    toCompletion: async () => ({
+      assistantText: text,
+      toolCalls: toolCalls.map((c) => ({
+        name: (c as { toolName: string }).toolName,
+        arguments: (c as { input?: unknown }).input ?? (c as { args?: unknown }).args ?? {},
+        id: (c as { toolCallId?: string }).toolCallId,
+      })),
+    }),
   };
 }
 
 describe('runChatLoop', () => {
   it('returns messages with assistant response when no tool calls', async () => {
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Hello!'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Hello!'));
 
     const ctx = new ContextManager();
     const tokens: string[] = [];
@@ -73,8 +94,8 @@ describe('runChatLoop', () => {
   });
 
   it('detects diff markers in response', async () => {
-    mockStreamText.mockResolvedValueOnce(
-      makeStreamResponse('file_path: foo.ts\n<<<< SEARCH\nx\n====\ny\n>>>> REPLACE'),
+    mockStreamChatWithTools.mockResolvedValueOnce(
+      makeStreamResult('file_path: foo.ts\n<<<< SEARCH\nx\n====\ny\n>>>> REPLACE'),
     );
 
     const ctx = new ContextManager();
@@ -91,8 +112,8 @@ describe('runChatLoop', () => {
 
   it('invokes tool calls when present', async () => {
     // First iteration: returns tool call
-    mockStreamText.mockResolvedValueOnce(
-      makeStreamResponse('', [
+    mockStreamChatWithTools.mockResolvedValueOnce(
+      makeStreamResult('', [
         {
           toolName: 'read_file',
           args: { path: '/tmp/test.ts' },
@@ -100,7 +121,7 @@ describe('runChatLoop', () => {
       ]),
     );
     // Second iteration: returns text only (done)
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done reading file'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Done reading file'));
 
     const ctx = new ContextManager();
     const toolCalls: Array<{ name: string; args: unknown }> = [];
@@ -119,7 +140,7 @@ describe('runChatLoop', () => {
   });
 
   it('calls onDone exactly once when the loop finishes', async () => {
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Hello!'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Hello!'));
 
     const ctx = new ContextManager();
     const doneSpy = vi.fn();
@@ -136,7 +157,7 @@ describe('runChatLoop', () => {
   });
 
   it('tracks user prompt + assistant reply in ContextManager (fixes "context stuck at 0%" bug)', async () => {
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Hello world!'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Hello world!'));
 
     const ctx = new ContextManager(100_000);
     await runChatLoop(
@@ -156,12 +177,12 @@ describe('runChatLoop', () => {
   });
 
   it('tracks tool results in ContextManager when tools are invoked', async () => {
-    mockStreamText.mockResolvedValueOnce(
-      makeStreamResponse('', [
+    mockStreamChatWithTools.mockResolvedValueOnce(
+      makeStreamResult('', [
         { toolName: 'read_file', args: { path: '/tmp/test.ts' } },
       ]),
     );
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Done'));
 
     const ctx = new ContextManager(100_000);
     await runChatLoop(
@@ -177,12 +198,12 @@ describe('runChatLoop', () => {
   });
 
   it('fires onContextUpdate after each entry is added (mid-turn UI refresh)', async () => {
-    mockStreamText.mockResolvedValueOnce(
-      makeStreamResponse('', [
+    mockStreamChatWithTools.mockResolvedValueOnce(
+      makeStreamResult('', [
         { toolName: 'read_file', args: { path: '/tmp/test.ts' } },
       ]),
     );
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Done'));
 
     const ctx = new ContextManager(100_000);
     const snapshots: Array<{ totalTokens: number; entryCount: number }> = [];
@@ -217,7 +238,7 @@ describe('runChatLoop', () => {
     // broke out of the loop cleanly, so the caller saw a normal "agent done"
     // exit with no UI output — forcing the user to re-prompt multiple times.
     // Now it must throw a repo-owned, deterministic message.
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse(''));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult(''));
 
     const ctx = new ContextManager();
     await expect(
@@ -232,7 +253,7 @@ describe('runChatLoop', () => {
     // Callers that prefer event-style handling (e.g. protocol-session's
     // emit-on-event model) hook onError. It must fire BEFORE the throw so
     // the caller sees the event even if it lets the exception propagate.
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse(''));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult(''));
 
     const ctx = new ContextManager();
     const seen: Error[] = [];
@@ -253,12 +274,12 @@ describe('runChatLoop', () => {
     // model went straight from reasoning to a tool call. The empty-output
     // guard must NOT fire in that case (otherwise the loop would never
     // complete a tool-only turn).
-    mockStreamText.mockResolvedValueOnce(
-      makeStreamResponse('', [
+    mockStreamChatWithTools.mockResolvedValueOnce(
+      makeStreamResult('', [
         { toolName: 'read_file', args: { path: '/tmp/test.ts' } },
       ]),
     );
-    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done'));
+    mockStreamChatWithTools.mockResolvedValueOnce(makeStreamResult('Done'));
 
     const ctx = new ContextManager();
     // Must resolve, not reject.
