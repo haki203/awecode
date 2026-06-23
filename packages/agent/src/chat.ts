@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { streamText, jsonSchema, type ModelMessage, type ToolSet } from 'ai';
 import { createProvider } from '@awecode/llm';
 import type { AwecodeConfig } from '@awecode/llm';
@@ -86,6 +89,32 @@ at: @after: function foo
 >>>> REPLACE
 
 Use the read_file, search_files, list_files, and shell_exec tools to explore the codebase before making changes.`;
+
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Absolute path to the externalized base prompt. `prompts/` is a sibling of
+ * both `src/` (dev) and `dist/` (built), so going up one level from this
+ * module reaches `packages/agent/` in both layouts. Mirrors the
+ * `getBuiltInSkillsDir()` pattern in @awecode/workflow.
+ */
+export function getSystemPromptPath(): string {
+  return join(MODULE_DIR, '..', 'prompts', 'system.md');
+}
+
+function loadSystemPrompt(): string {
+  try {
+    return readFileSync(getSystemPromptPath(), 'utf-8').trim();
+  } catch (err) {
+    console.warn(
+      `Could not load system prompt at ${getSystemPromptPath()}; falling back to inline DEFAULT_SYSTEM_PROMPT.`,
+      err instanceof Error ? err.message : err,
+    );
+    return DEFAULT_SYSTEM_PROMPT;
+  }
+}
+
+const SYSTEM_PROMPT = loadSystemPrompt();
 
 /**
  * Vercel AI SDK v6 renames the legacy `parameters` field on a tool to
@@ -206,7 +235,7 @@ export async function runChatLoop(
       const result = await streamText({
         model,
         messages,
-        system: opts.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+        system: opts.systemPrompt ?? SYSTEM_PROMPT,
         tools,
         maxOutputTokens: 4096,
         abortSignal: opts.abortSignal,

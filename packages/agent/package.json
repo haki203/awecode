@@ -17,7 +17,8 @@
     "./persistence/checkpoint": {
       "types": "./src/persistence/checkpoint.ts",
       "import": "./src/persistence/checkpoint.ts"
-    }
+    },
+    "./prompts/*": "./prompts/*"
   },
   "scripts": {
     "build": "tsup",
