@@ -42,6 +42,12 @@ export type {
   AdapterToolDefinition,
   NormalizedToolCall,
 } from './adapter.js';
+export { streamChatWithTools } from './stream-tools.js';
+export type {
+  StreamWithToolsOptions,
+  StreamWithToolsResult,
+} from './stream-tools.js';
+export { resolveProviderConfig } from './chat.js';
 export {
   resolveContextBudget,
   resolveProviderContextWindow,

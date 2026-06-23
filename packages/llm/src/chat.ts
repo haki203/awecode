@@ -55,7 +55,7 @@ export interface ChatResult {
  * Kept shared between {@link chat} and {@link streamChat} so both entry points
  * surface an identical failure mode.
  */
-function resolveProviderConfig(config: AwecodeConfig) {
+export function resolveProviderConfig(config: AwecodeConfig) {
   const providerConfig = config.providers[config.activeProvider];
   if (!providerConfig) {
     throw new Error(
