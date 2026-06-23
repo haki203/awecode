@@ -210,4 +210,45 @@ describe('rebuildContextFromSession', () => {
     rebuildContextFromSession({ messages: [], contextEntries: records }, cm);
     expect(cm.entryCount).toBe(1);
   });
+
+  it('narrows record.type to the ContextEntryType union (fixes resume.ts:168 build error)', () => {
+    // ContextEntryRecord.type is `string` (loosely typed to decouple
+    // sessions.ts from the context layer). rebuildContextFromSession must
+    // narrow it back to ContextEntryType so ContextManager.restore's
+    // signature is satisfied. Without the cast, TS rejects the assignment
+    // at build time — this is the bug that broke `@awecode/agent`'s DTS
+    // build.
+    const cm = new ContextManager(100_000);
+    const records: ContextEntryRecord[] = [
+      { id: 'r1', type: 'file', content: 'x', tokens: 1, addedAt: 1, addedBy: 'user' },
+      { id: 'r2', type: 'diff', content: 'y', tokens: 1, addedAt: 2, addedBy: 'agent' },
+      { id: 'r3', type: 'repo-map', content: 'z', tokens: 1, addedAt: 3, addedBy: 'agent' },
+    ];
+
+    rebuildContextFromSession({ messages: [], contextEntries: records }, cm);
+
+    // All three known types survive the narrowing unchanged.
+    expect(cm.entryCount).toBe(3);
+    const types = cm.snapshot().map((e) => e.type);
+    expect(types).toEqual(['file', 'diff', 'repo-map']);
+  });
+
+  it('falls back to command-output for unknown record.type (corrupt or forward-incompatible JSON)', () => {
+    // A session file written by a newer version (with a new entry type we
+    // don't know about) or hand-edited/corrupt JSON could carry a `type`
+    // value outside the ContextEntryType union. The resume path must not
+    // crash — it downgrades the entry to 'command-output' so the meter
+    // still reflects the token cost.
+    const cm = new ContextManager(100_000);
+    const records: ContextEntryRecord[] = [
+      { id: 'r1', type: 'user-message', content: 'known', tokens: 1, addedAt: 1, addedBy: 'user' },
+      { id: 'r2', type: 'future-type-from-v2' as string, content: 'unknown', tokens: 1, addedAt: 2, addedBy: 'agent' },
+    ];
+
+    rebuildContextFromSession({ messages: [], contextEntries: records }, cm);
+
+    expect(cm.entryCount).toBe(2);
+    const types = cm.snapshot().map((e) => e.type);
+    expect(types).toEqual(['user-message', 'command-output']);
+  });
 });

@@ -167,6 +167,13 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
         config,
         context,
         abortSignal: abortController.signal,
+        onError: (err) => {
+          // Surface the error to the transcript immediately. The loop also
+          // re-throws, so the catch below will fire too, but emitting here
+          // guarantees the message appears even if a future refactor stops
+          // propagating the throw. Mirrors protocol-session's emit-on-error.
+          setMessages((m) => [...m, { role: 'error', content: err.message }]);
+        },
         onToken: (chunk) => {
           setMessages((m) => {
             const last = m[m.length - 1];
@@ -248,13 +255,24 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
         err instanceof Error &&
         (err.name === 'AbortError' ||
           (err as { code?: string }).code === 'ABORT_ERR');
-      setMessages((m) => [
-        ...m,
-        {
-          role: 'assistant',
-          content: isAbort ? '[aborted]' : `[error] ${(err as Error).message}`,
-        },
-      ]);
+      if (isAbort) {
+        setMessages((m) => [
+          ...m,
+          { role: 'assistant', content: '[aborted]' },
+        ]);
+      } else {
+        // Dedupe: onError already emitted the same message before the throw,
+        // so skip if the last message is an error with identical content.
+        // This keeps the transcript showing exactly one red error row.
+        const message = (err as Error).message;
+        setMessages((m) => {
+          const last = m[m.length - 1];
+          if (last && last.role === 'error' && last.content === message) {
+            return m;
+          }
+          return [...m, { role: 'error', content: message }];
+        });
+      }
     } finally {
       streamingRef.current = false;
       setIsStreaming(false);

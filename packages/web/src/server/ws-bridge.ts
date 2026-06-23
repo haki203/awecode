@@ -7,7 +7,7 @@ import type { GuiAgentEvent, GuiClientCommand } from '@awecode/gui/shared/protoc
 import type { AwecodeConfig } from '@awecode/llm';
 import type { ModelMessage } from 'ai';
 import type { ContextManager, ProtocolSession } from '@awecode/agent';
-import { applyEvent, resumeFromMessages } from '@awecode/agent';
+import { applyEvent, resumeFromMessages, contextEntryRecordsToEntries } from '@awecode/agent';
 import {
   saveSession,
   loadSession,
@@ -83,7 +83,7 @@ export function attachWsServer(server: Server, wss: WebSocketServer, ctx: WsCtx)
         // of starting from 0%. The next emitted context_snapshot will
         // carry the restored values to the client.
         if (existing.contextEntries && existing.contextEntries.length > 0) {
-          ctx.context.restore(existing.contextEntries, existing.contextBudgetTokens);
+          ctx.context.restore(contextEntryRecordsToEntries(existing.contextEntries), existing.contextBudgetTokens);
         } else {
           // Legacy session JSON (pre-v0.2): reconstruct what we can from
           // messages[] so the meter isn't stuck at 0%.

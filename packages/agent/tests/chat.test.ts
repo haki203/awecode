@@ -210,4 +210,62 @@ describe('runChatLoop', () => {
     expect(last.entryCount).toBe(ctx.entryCount);
     expect(last.totalTokens).toBe(ctx.totalTokens);
   });
+
+  it('throws when stream produces empty output (Bug 1: silent-failure fix)', async () => {
+    // The provider returns an empty stream (no tokens, no tool calls). Before
+    // the fix, runChatLoop pushed `{ role: 'assistant', content: '' }` and
+    // broke out of the loop cleanly, so the caller saw a normal "agent done"
+    // exit with no UI output — forcing the user to re-prompt multiple times.
+    // Now it must throw a repo-owned, deterministic message.
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse(''));
+
+    const ctx = new ContextManager();
+    await expect(
+      runChatLoop([{ role: 'user', content: 'hi' }], {
+        config: mockConfig,
+        context: ctx,
+      }),
+    ).rejects.toThrow('No output generated. Check the stream for errors.');
+  });
+
+  it('fires onError before throwing on empty output', async () => {
+    // Callers that prefer event-style handling (e.g. protocol-session's
+    // emit-on-event model) hook onError. It must fire BEFORE the throw so
+    // the caller sees the event even if it lets the exception propagate.
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse(''));
+
+    const ctx = new ContextManager();
+    const seen: Error[] = [];
+    await expect(
+      runChatLoop([{ role: 'user', content: 'hi' }], {
+        config: mockConfig,
+        context: ctx,
+        onError: (err) => seen.push(err),
+      }),
+    ).rejects.toThrow();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.message).toBe('No output generated. Check the stream for errors.');
+  });
+
+  it('does not throw on empty output when a tool call is present', async () => {
+    // Tool-call iterations legitimately produce empty assistant text — the
+    // model went straight from reasoning to a tool call. The empty-output
+    // guard must NOT fire in that case (otherwise the loop would never
+    // complete a tool-only turn).
+    mockStreamText.mockResolvedValueOnce(
+      makeStreamResponse('', [
+        { toolName: 'read_file', args: { path: '/tmp/test.ts' } },
+      ]),
+    );
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done'));
+
+    const ctx = new ContextManager();
+    // Must resolve, not reject.
+    const result = await runChatLoop(
+      [{ role: 'user', content: 'read file' }],
+      { config: mockConfig, context: ctx },
+    );
+    expect(result.length).toBeGreaterThan(0);
+  });
 });

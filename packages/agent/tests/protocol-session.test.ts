@@ -97,6 +97,37 @@ describe('ProtocolSession', () => {
     expect(events[events.length - 1]!.type).toBe('done');
   });
 
+  it('surfaces empty-stream errors as error events (Bug 1 regression guard for GUI/PWA)', async () => {
+    // The real runChatLoop now throws when the stream yields no assistant
+    // text. protocol-session's catch block must forward that throw as an
+    // `error` event so GUI/PWA users see the failure immediately instead
+    // of a silent "agent done" — mirrors the symptom the TUI had before
+    // the fix. This test pins the contract end-to-end through the session.
+    const events: GuiAgentEvent[] = [];
+    function emptyStreamRunLoop(): Promise<ModelMessage[]> {
+      return Promise.reject(
+        new Error('No output generated. Check the stream for errors.'),
+      );
+    }
+
+    const session = createProtocolSession({
+      config: mockConfig,
+      context: new ContextManager(),
+      cwd: '/proj',
+      send: (ev) => { events.push(ev); },
+      runChatLoop: emptyStreamRunLoop as any,
+    });
+
+    await session.handlePrompt('hi');
+
+    const errorEvent = events.find(
+      (e) => e.type === 'error',
+    ) as Extract<GuiAgentEvent, { type: 'error' }> | undefined;
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.message).toContain('No output generated');
+    expect(events[events.length - 1]!.type).toBe('done');
+  });
+
   it('handles abort gracefully (AbortError → [aborted] message)', async () => {
     const events: GuiAgentEvent[] = [];
     function abortingRunLoop(_msgs: ModelMessage[], _opts: any): Promise<ModelMessage[]> {

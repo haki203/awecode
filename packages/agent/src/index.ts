@@ -50,7 +50,7 @@ export * as persistence from './persistence/sessions.js';
 
 export { applyEvent } from './persistence/session-event-handler.js';
 
-export { resumeFromMessages, rebuildContextFromSession } from './resume.js';
+export { resumeFromMessages, rebuildContextFromSession, contextEntryRecordsToEntries } from './resume.js';
 
 export { createProtocolSession } from './protocol-session.js';
 export type { ProtocolSession, ProtocolSessionOptions } from './protocol-session.js';

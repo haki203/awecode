@@ -14,7 +14,54 @@
 
 import type { ModelMessage } from 'ai';
 import type { SessionMessage, ContextEntryRecord } from './persistence/sessions.js';
+import type { ContextEntry, ContextEntryType } from './context/entry.js';
 import type { ContextManager } from './context/manager.js';
+
+/**
+ * The 9 entry types the ContextManager recognises. Persisted records carry
+ * `type: string` (loosely typed to keep `sessions.ts` decoupled from the
+ * context layer), so when restoring we must narrow each record's `type`
+ * back to the `ContextEntryType` union. Unknown values — e.g. a type
+ * string written by a newer version, or a hand-edited/corrupt session
+ * file — fall back to `'command-output'` so the entry still shows up in
+ * the meter rather than crashing the resume path.
+ */
+const KNOWN_ENTRY_TYPES: ReadonlySet<ContextEntryType> = new Set([
+  'file',
+  'snippet',
+  'symbol',
+  'command-output',
+  'user-message',
+  'assistant-message',
+  'tool-result',
+  'diff',
+  'repo-map',
+]);
+
+function recordsToEntries(records: ContextEntryRecord[]): ContextEntry[] {
+  return records.map((r) => ({
+    ...r,
+    type: KNOWN_ENTRY_TYPES.has(r.type as ContextEntryType)
+      ? (r.type as ContextEntryType)
+      : 'command-output',
+  }));
+}
+
+/**
+ * Public alias for {@link recordsToEntries}, re-exported from the package
+ * root. Callers that load a persisted `Session` and need to feed its
+ * `contextEntries` into `ContextManager.restore` must narrow each record's
+ * `type: string` down to `ContextEntryType` first — passing the raw records
+ * directly fails the build (TS2345) and would also bypass the
+ * unknown-type fallback. All three resume sites (agent resume.ts, the CLI
+ * GUI bridge, and the Web WS bridge) share this helper so the narrowing
+ * rule lives in exactly one place.
+ */
+export function contextEntryRecordsToEntries(
+  records: ContextEntryRecord[],
+): ContextEntry[] {
+  return recordsToEntries(records);
+}
 
 /**
  * Transform a persisted `Session.messages` array into the `ModelMessage[]`
@@ -165,7 +212,7 @@ export function rebuildContextFromSession(
   cm: ContextManager,
 ): void {
   if (session.contextEntries && session.contextEntries.length > 0) {
-    cm.restore(session.contextEntries, session.contextBudgetTokens);
+    cm.restore(recordsToEntries(session.contextEntries), session.contextBudgetTokens);
     return;
   }
   // Fallback: reconstruct from messages. We don't know the original

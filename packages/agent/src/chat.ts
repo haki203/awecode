@@ -46,6 +46,15 @@ export interface ChatLoopOptions {
    * ContextManager state at the moment of the callback.
    */
   onContextUpdate?: (snapshot: ContextUpdateSnapshot) => void;
+  /**
+   * Fired when the loop detects a recoverable error condition before it
+   * throws — currently when the stream produced no assistant text. Callers
+   * that prefer to react without relying on the thrown exception (e.g. the
+   * protocol-session emit-on-event model) hook here. The same error is
+   * always re-thrown immediately afterwards, so callers with a try/catch
+   * around `runChatLoop` will also see it.
+   */
+  onError?: (err: Error) => void;
   /** Called exactly once when the loop exits (normally, via abort, or via throw). */
   onDone?: () => void;
 }
@@ -209,6 +218,29 @@ export async function runChatLoop(
         opts.onToken?.(chunk);
       }
 
+      // Read toolCalls early so the empty-output guard can distinguish a
+      // truly-empty stream (silent failure) from a legitimate tool-only
+      // turn where the model emits no text and jumps straight to a tool
+      // call. Resolving `toolCalls` before the guard is safe — the SDK's
+      // promise only settles after the stream ends.
+      const toolCalls = await result.toolCalls;
+
+      // Detect an empty stream: the provider returned no assistant text AND
+      // no tool calls. This is the silent-failure root cause — without the
+      // throw, the loop would `break` cleanly at the empty-toolCalls check
+      // below and callers would see a normal "agent done" exit with no UI
+      // output, forcing the user to re-prompt multiple times before any
+      // error surfaced. Throw a stable, repo-owned message rather than
+      // passing through any SDK-internal text so callers can match on it
+      // deterministically.
+      if (assistantText === '' && (!toolCalls || toolCalls.length === 0)) {
+        const err = new Error(
+          'No output generated. Check the stream for errors.',
+        );
+        opts.onError?.(err);
+        throw err;
+      }
+
       if (assistantText.includes('<<<< SEARCH')) {
         opts.onDiffDetected?.(assistantText);
       }
@@ -234,7 +266,6 @@ export async function runChatLoop(
       opts.context.addAssistantMessage(assistantText);
       fireContextUpdate();
 
-      const toolCalls = await result.toolCalls;
       if (!toolCalls || toolCalls.length === 0) {
         break; // Agent done
       }

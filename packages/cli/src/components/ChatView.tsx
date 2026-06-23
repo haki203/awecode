@@ -18,7 +18,7 @@ import { colors } from '../theme.js';
 import { Spinner } from './Spinner.js';
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'tool';
+  role: 'user' | 'assistant' | 'tool' | 'error';
   content: string;
 }
 
@@ -48,6 +48,16 @@ function renderMessage(msg: ChatMessage): ReactNode {
           ●
         </Text>
         <Text>{msg.content}</Text>
+      </Box>
+    );
+  }
+  if (msg.role === 'error') {
+    return (
+      <Box gap={1}>
+        <Text color={colors.danger} bold>
+          !
+        </Text>
+        <Text color={colors.danger}>{msg.content}</Text>
       </Box>
     );
   }

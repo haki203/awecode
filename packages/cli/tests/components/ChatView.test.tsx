@@ -51,6 +51,29 @@ describe('ChatView', () => {
     expect(frame).toContain('ran lint');
   });
 
+  it('renders error messages with the ! glyph and danger color', () => {
+    // Bug 2 regression test: previously errors were smashed into
+    // role: 'assistant' with a literal `[error] ` prefix, so they rendered
+    // with the green agent bullet ● and default text color. The fix adds a
+    // dedicated 'error' role and a red render branch using colors.danger.
+    const { lastFrame } = render(
+      <ChatView
+        messages={[{ role: 'error', content: 'No output generated. Check the stream for errors.' }]}
+        isStreaming={false}
+      />,
+    );
+    const frame = lastFrame() ?? '';
+    // Error glyph must appear, and the green agent bullet must NOT —
+    // that was the original mis-rendering.
+    expect(frame).toContain('!');
+    expect(frame).not.toContain('●');
+    // Error message text must be visible.
+    expect(frame).toContain('No output generated');
+    // No [error] prefix leaking into the visible text — the renderer owns
+    // the visual signal now via color + glyph.
+    expect(frame).not.toContain('[error]');
+  });
+
   it('truncates tool messages longer than 80 chars', () => {
     // New ChatView truncates tool messages to 80 chars (down from 200) to keep
     // the transcript scannable — matches Codex/OpenCode density. Use a single

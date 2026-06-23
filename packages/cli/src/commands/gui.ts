@@ -23,7 +23,7 @@ import {
   resolveProviderContextWindow,
   type AwecodeConfig,
 } from '@awecode/llm';
-import { ContextManager, createProtocolSession } from '@awecode/agent';
+import { ContextManager, createProtocolSession, contextEntryRecordsToEntries } from '@awecode/agent';
 import type { GuiClientCommand } from '@awecode/gui/shared/protocol';
 
 /**
@@ -209,7 +209,7 @@ async function runInternalProtocolServer(): Promise<void> {
       // context used after resume. Without this, the meter starts at 0%
       // until new turns accumulate entries.
       if (cmd.contextEntries && cmd.contextEntries.length > 0) {
-        context.restore(cmd.contextEntries, cmd.contextBudgetTokens);
+        context.restore(contextEntryRecordsToEntries(cmd.contextEntries), cmd.contextBudgetTokens);
         // Re-emit a fresh snapshot so the UI updates immediately rather
         // than waiting for the next onContextUpdate fire.
         session.emitContextSnapshot();
