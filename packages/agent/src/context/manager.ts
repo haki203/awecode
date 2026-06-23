@@ -18,6 +18,9 @@ import {
   createFileEntry,
   createCommandOutputEntry,
   createDiffEntry,
+  createUserMessageEntry,
+  createAssistantMessageEntry,
+  createToolResultEntry,
 } from './entry.js';
 
 export interface AddFileArgs {
@@ -29,7 +32,7 @@ export interface AddFileArgs {
 
 export class ContextManager {
   private entries: ContextEntry[] = [];
-  private readonly budget: number;
+  private budget: number;
 
   constructor(budget: number = 100_000) {
     this.budget = budget;
@@ -52,6 +55,24 @@ export class ContextManager {
 
   addDiff(args: { content: string; addedBy?: 'user' | 'agent' }): ContextEntry {
     const entry = createDiffEntry(args);
+    this.entries.push(entry);
+    return entry;
+  }
+
+  addUserMessage(content: string): ContextEntry {
+    const entry = createUserMessageEntry(content);
+    this.entries.push(entry);
+    return entry;
+  }
+
+  addAssistantMessage(content: string): ContextEntry {
+    const entry = createAssistantMessageEntry(content);
+    this.entries.push(entry);
+    return entry;
+  }
+
+  addToolResult(args: { toolName: string; content: string }): ContextEntry {
+    const entry = createToolResultEntry(args);
     this.entries.push(entry);
     return entry;
   }
@@ -88,16 +109,74 @@ export class ContextManager {
     return this.budget;
   }
 
+  get entryCount(): number {
+    return this.entries.length;
+  }
+
   snapshot(): readonly ContextEntry[] {
     return [...this.entries];
+  }
+
+  /**
+   * Clear all entries. Used by `/compact` after summarisation completes —
+   * the summary itself becomes the new single entry.
+   */
+  clear(): void {
+    this.entries = [];
+  }
+
+  /**
+   * Replace the entire entry list from a persisted snapshot. Used by
+   * session resume to restore the meter to the same state as when the
+   * session was saved. Existing entries are dropped first so repeated
+   * calls don't accumulate duplicates.
+   *
+   * Entry objects are shallow-cloned (with fresh array identity) so the
+   * caller can keep mutating its source array without leaking into the
+   * ContextManager.
+   *
+   * @param entries  Full entries to install. `tokens` is taken as-is
+   *                 (no re-count) so the persisted value round-trips
+   *                 exactly. If the caller passes entries without `tokens`,
+   *                 they're regenerated via the same `gpt-tokenizer` path
+   *                 used by `createEntry`.
+   * @param budget   Optional new context budget. When omitted, the
+   *                 existing budget is kept.
+   */
+  restore(entries: ContextEntry[], budget?: number): void {
+    this.entries = entries.map((e) => ({ ...e }));
+    if (budget !== undefined) this.budget = budget;
+  }
+
+  /**
+   * Serialise the current entries for persistence. Returns shallow
+   * clones so the returned array can be safely stored, transferred, or
+   * JSON-stringified without aliasing internal state.
+   */
+  toRecords(): ContextEntry[] {
+    return this.entries.map((e) => ({ ...e }));
   }
 
   toMessages(): ModelMessage[] {
     if (this.entries.length === 0) return [];
     const blocks = this.entries.map((e) => {
-      const header = e.path
-        ? `File: ${e.path}${e.lines ? ` (lines ${e.lines.start}-${e.lines.end})` : ''}`
-        : `[${e.type}]`;
+      let header: string;
+      switch (e.type) {
+        case 'file':
+          header = `File: ${e.path}${e.lines ? ` (lines ${e.lines.start}-${e.lines.end})` : ''}`;
+          break;
+        case 'user-message':
+          header = 'User';
+          break;
+        case 'assistant-message':
+          header = 'Assistant';
+          break;
+        case 'tool-result':
+          header = 'Tool result';
+          break;
+        default:
+          header = `[${e.type}]`;
+      }
       return `--- ${header} ---\n${e.content}`;
     });
     return [

@@ -126,7 +126,25 @@ export function applyEvent(session: Session, ev: GuiAgentEvent): void {
         ts: now,
       });
       break;
-    case 'context_snapshot':
+    case 'context_snapshot': {
+      // Persist the full context snapshot so resume can rebuild the meter.
+      // We only store fields needed for StatusBar accuracy + a useful
+      // ContextPanel list. Content is preserved so `ContextManager.restore`
+      // can recompute tokens if needed (though we also keep the original
+      // token count to avoid drift across tokenizer versions).
+      session.contextEntries = ev.entries.map((e) => ({
+        id: e.id ?? 'restored',
+        type: e.type,
+        path: e.path,
+        lines: e.lines,
+        content: e.content ?? e.label,
+        tokens: e.tokens ?? 0,
+        addedAt: e.addedAt ?? now,
+        addedBy: e.addedBy ?? 'agent',
+      }));
+      session.contextBudgetTokens = ev.budgetTokens;
+      break;
+    }
     case 'intent':
     case 'diff_detected':
       // No persistence change.

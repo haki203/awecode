@@ -61,12 +61,23 @@ export function PromptInput({ disabled, isStreaming, onSubmit, onAbort }: Props)
       />
       <div className="prompt-actions">
         {isStreaming ? (
-          <button className="btn-abort" onClick={onAbort}>
-            Abort (esc)
+          <button
+            className="btn-abort"
+            onClick={onAbort}
+            aria-label="Abort (esc)"
+            title="Abort (esc)"
+          >
+            <span aria-hidden="true">■</span>
           </button>
         ) : (
-          <button className="btn-send" onClick={submit} disabled={!value.trim()}>
-            Send
+          <button
+            className="btn-send"
+            onClick={submit}
+            disabled={!value.trim()}
+            aria-label="Send"
+            title="Send"
+          >
+            <span className="btn-send-glyph" aria-hidden="true">▶</span>
           </button>
         )}
       </div>

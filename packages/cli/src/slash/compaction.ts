@@ -14,23 +14,36 @@
 
 import { registerSlashCommand, type SlashContext } from './index.js';
 
+/**
+ * Canonical name is `/compact` (aligns with Cline, Cursor, and standard AI
+ * assistant vocabulary). `/smol` and `/condense` remain as aliases for
+ * muscle-memory and backwards compatibility — ADR-0006 previously
+ * standardised on `/smol` based on a misreading of Cline issue #7222
+ * (that issue is about *models* mis-emitting `/compact` as a tool call,
+ * not about users typing it).
+ */
+export const COMPACT_PRIMARY = 'compact';
+export const COMPACT_ALIASES = ['smol', 'condense'] as const;
+
 export function registerCompactionSlashCommands(): void {
-  const smolHandler = async (_args: string[], _ctx: SlashContext) => {
+  const compactHandler = async (_args: string[], _ctx: SlashContext) => {
     console.log('⚡ Compacting context...');
     console.log('(This command triggers LLM-based summarization. Wire to chat loop to use.)');
   };
 
   registerSlashCommand({
-    name: 'smol',
-    description: 'Compact conversation (alias: /condense)',
-    handler: smolHandler,
+    name: COMPACT_PRIMARY,
+    description: `Compact conversation via LLM summarisation (aliases: /${COMPACT_ALIASES.join(', /')})`,
+    handler: compactHandler,
   });
 
-  registerSlashCommand({
-    name: 'condense',
-    description: 'Alias for /smol',
-    handler: smolHandler,
-  });
+  for (const alias of COMPACT_ALIASES) {
+    registerSlashCommand({
+      name: alias,
+      description: `Alias for /${COMPACT_PRIMARY}`,
+      handler: compactHandler,
+    });
+  }
 
   registerSlashCommand({
     name: 'tokens',

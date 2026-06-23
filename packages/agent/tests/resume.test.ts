@@ -13,8 +13,9 @@
 // limitations under the License.
 
 import { describe, it, expect } from 'vitest';
-import { resumeFromMessages } from '../src/resume.js';
-import type { SessionMessage } from '../src/persistence/sessions.js';
+import { resumeFromMessages, rebuildContextFromSession } from '../src/resume.js';
+import { ContextManager } from '../src/context/manager.js';
+import type { SessionMessage, ContextEntryRecord } from '../src/persistence/sessions.js';
 
 describe('resumeFromMessages', () => {
   it('returns empty for empty input', () => {
@@ -129,5 +130,84 @@ describe('resumeFromMessages', () => {
     expect(toolMessages[1]!.content[0]!.toolCallId).toBe('b');
     expect(toolMessages[1]!.content[0]!.toolName).toBe('shell_exec');
     expect(toolMessages[1]!.content[0]!.output.value).toBe('resultB');
+  });
+});
+
+describe('rebuildContextFromSession', () => {
+  it('restores from session.contextEntries when available (preferred path)', () => {
+    const cm = new ContextManager(100_000);
+    cm.addUserMessage('stale'); // should be cleared by rebuild
+    expect(cm.entryCount).toBe(1);
+
+    const records: ContextEntryRecord[] = [
+      {
+        id: 'r1',
+        type: 'user-message',
+        content: 'hello',
+        tokens: 5,
+        addedAt: 100,
+        addedBy: 'user',
+      },
+      {
+        id: 'r2',
+        type: 'assistant-message',
+        content: 'world',
+        tokens: 8,
+        addedAt: 101,
+        addedBy: 'agent',
+      },
+    ];
+
+    rebuildContextFromSession(
+      { messages: [], contextEntries: records, contextBudgetTokens: 200_000 },
+      cm,
+    );
+
+    expect(cm.entryCount).toBe(2);
+    expect(cm.totalTokens).toBe(13); // 5 + 8
+    expect(cm.budgetTokens).toBe(200_000);
+    expect(cm.snapshot()[0]!.content).toBe('hello');
+  });
+
+  it('falls back to reconstructing from messages[] for legacy sessions', () => {
+    const cm = new ContextManager(100_000);
+    const messages: SessionMessage[] = [
+      { role: 'user', content: 'hi', ts: 1 },
+      { role: 'assistant', content: 'hello there', ts: 2 },
+      { role: 'tool', content: 'call read_file', ts: 3, toolName: 'read_file' },
+      { role: 'tool', content: '{"lines":["x"]}', ts: 4, toolName: 'read_file' },
+      { role: 'assistant', content: 'done', ts: 5 },
+    ];
+
+    rebuildContextFromSession({ messages }, cm);
+
+    // 4 entries: user, assistant, tool-result (skip the "call ..." marker),
+    // assistant. Error messages would also be skipped.
+    expect(cm.entryCount).toBe(4);
+    const types = cm.snapshot().map((e) => e.type);
+    expect(types).toEqual([
+      'user-message',
+      'assistant-message',
+      'tool-result',
+      'assistant-message',
+    ]);
+    // Tokens were recomputed by gpt-tokenizer — just verify non-zero.
+    expect(cm.totalTokens).toBeGreaterThan(0);
+    // Budget preserved (fallback doesn't touch it).
+    expect(cm.budgetTokens).toBe(100_000);
+  });
+
+  it('clears existing entries before restore (no duplicates on repeated resume)', () => {
+    const cm = new ContextManager();
+    const records: ContextEntryRecord[] = [
+      { id: 'a', type: 'user-message', content: 'x', tokens: 1, addedAt: 1, addedBy: 'user' },
+    ];
+
+    rebuildContextFromSession({ messages: [], contextEntries: records }, cm);
+    expect(cm.entryCount).toBe(1);
+
+    // Resume the same session again — should NOT accumulate.
+    rebuildContextFromSession({ messages: [], contextEntries: records }, cm);
+    expect(cm.entryCount).toBe(1);
   });
 });

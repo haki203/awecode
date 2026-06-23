@@ -24,6 +24,7 @@ const ctx: SlashContext = {
 describe('compaction slash commands', () => {
   it('registers 4 commands', () => {
     registerCompactionSlashCommands();
+    expect(getSlashCommand('compact')).toBeDefined();
     expect(getSlashCommand('smol')).toBeDefined();
     expect(getSlashCommand('condense')).toBeDefined();
     expect(getSlashCommand('tokens')).toBeDefined();
@@ -31,11 +32,13 @@ describe('compaction slash commands', () => {
     expect(getSlashCommand('restore')).toBeDefined();
   });
 
-  it('/smol and /condense are aliases', () => {
+  it('/compact is the primary command name with /smol and /condense as aliases', () => {
     registerCompactionSlashCommands();
+    const primary = getSlashCommand('compact')!;
     const smol = getSlashCommand('smol')!;
     const condense = getSlashCommand('condense')!;
-    expect(smol.handler).toBe(condense.handler);
+    expect(primary.handler).toBe(smol.handler);
+    expect(primary.handler).toBe(condense.handler);
   });
 
   it('/tokens prints placeholder (without real context)', async () => {

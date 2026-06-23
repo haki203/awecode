@@ -30,7 +30,7 @@ describe('saveCheckpoint + loadCheckpoint', () => {
     ];
     const id = await saveCheckpoint(tmpProject, {
       timestamp: '2026-06-19T17:00:00Z',
-      trigger: 'manual /smol',
+      trigger: 'manual /compact',
       preCompactTokens: 100,
       entries,
       conversationHistory: [{ role: 'user', content: 'hi' }],

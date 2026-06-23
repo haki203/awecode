@@ -12,7 +12,7 @@ When conversation approaches context budget, awecode compacts via LLM summarizat
 
 ## Manual commands
 
-- `/smol` — trigger compaction immediately (alias: `/condense`)
+- `/compact` — trigger compaction immediately (aliases: `/smol`, `/condense`)
 - `/tokens` — show token usage breakdown
 - `/checkpoint` — save snapshot
 - `/restore <id>` — restore from checkpoint

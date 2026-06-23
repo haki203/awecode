@@ -18,6 +18,7 @@ interface Props {
   usedTokens?: number;
   budgetTokens?: number;
   isStreaming?: boolean;
+  transportStatus?: 'connecting' | 'open' | 'closed';
   showContext?: boolean;
   onToggleContext?: () => void;
 }
@@ -42,23 +43,66 @@ export function StatusBar({
   usedTokens,
   budgetTokens,
   isStreaming,
+  transportStatus = 'open',
   showContext,
   onToggleContext,
 }: Props) {
+  // Treat the pre-snapshot state (both values missing) as "no data yet"
+  // rather than literally 0/0 — otherwise users see an inert 0/0 bar
+  // until the first `context_snapshot` frame arrives over the socket.
+  const hasCtx =
+    (typeof usedTokens === 'number' && usedTokens > 0) ||
+    (typeof budgetTokens === 'number' && budgetTokens > 0);
   const pct =
     budgetTokens && usedTokens
       ? Math.min(100, Math.round((usedTokens / budgetTokens) * 100))
       : 0;
   return (
-    <div className="status-bar">
+    <div className="status-bar" role="contentinfo">
       <div className="status-left">
         <span className="brand">awecode</span>
-        {model && <span className="dim">· {model}</span>}
-        {cwd && <span className="dim mono">· {shortCwd(cwd)}</span>}
+        {model && <span className="status-model dim">{model}</span>}
+        {cwd && (
+          <span className="status-cwd dim mono" title={cwd}>
+            {shortCwd(cwd)}
+          </span>
+        )}
       </div>
+
+      <div className="status-center">
+        {isStreaming && (
+          <span className="stream-dot" aria-live="polite">
+            streaming
+          </span>
+        )}
+        {transportStatus !== 'open' && (
+          <span
+            className="status-transport"
+            title={
+              transportStatus === 'connecting'
+                ? 'Connecting…'
+                : 'Disconnected — reconnecting…'
+            }
+          >
+            {transportStatus === 'connecting' ? 'connecting…' : 'reconnecting…'}
+          </span>
+        )}
+      </div>
+
       <div className="status-right">
-        {isStreaming && <span className="stream-dot">streaming</span>}
-        <span className="ctx-meter" title={`${usedTokens ?? 0}/${budgetTokens ?? 0} tokens`}>
+        <span
+          className="ctx-meter"
+          title={
+            hasCtx
+              ? `${usedTokens ?? 0}/${budgetTokens ?? 0} tokens`
+              : 'context: awaiting snapshot…'
+          }
+          aria-label={
+            hasCtx
+              ? `context ${usedTokens} of ${budgetTokens} tokens`
+              : 'context awaiting snapshot'
+          }
+        >
           <span
             className="ctx-bar"
             style={{
@@ -67,10 +111,15 @@ export function StatusBar({
             }}
           />
           <span className="ctx-text">
-            {fmt(usedTokens)}/{fmt(budgetTokens)}
+            {hasCtx ? `${fmt(usedTokens)}/${fmt(budgetTokens)}` : '—'}
           </span>
         </span>
-        <button onClick={onToggleContext} aria-pressed={showContext}>
+        <button
+          className="ctx-toggle"
+          onClick={onToggleContext}
+          aria-pressed={showContext}
+          title={showContext ? 'Hide context panel' : 'Show context panel'}
+        >
           {showContext ? 'Hide ctx' : 'Show ctx'}
         </button>
       </div>

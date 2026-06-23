@@ -67,7 +67,7 @@ export function ContextOverlay({
       {showCompactionHint && (
         <Text color={colors.warn}>
           {' '}
-          auto-compact at {pct}% — /smol to trigger manually
+          auto-compact at {pct}% — /compact to trigger manually
         </Text>
       )}
 

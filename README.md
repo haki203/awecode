@@ -158,7 +158,7 @@ See [docs/workflows.md](docs/workflows.md) for the full guide.
 The left panel of the TUI shows exactly what's in the agent's context: every
 file, every tool output, with token counts and who added them (you or the
 agent). At 85% of context budget it turns yellow (`MODERATE`); at 95% red
-(`SEVERE`). Type `/smol` to compact, `/tokens` to inspect,
+(`SEVERE`). Type `/compact` to compact (alias `/smol`), `/tokens` to inspect,
 `/checkpoint` to snapshot, `/restore <id>` to roll back.
 
 See [docs/compaction.md](docs/compaction.md) for details.

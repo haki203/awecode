@@ -18,7 +18,7 @@ import type { ContextEntry } from '../context/entry.js';
 
 export interface Checkpoint {
   timestamp: string;
-  trigger: 'auto-compact' | 'manual /smol';
+  trigger: 'auto-compact' | 'manual /compact';
   preCompactTokens: number;
   entries: ContextEntry[];
   conversationHistory: unknown[];

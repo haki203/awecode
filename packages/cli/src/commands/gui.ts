@@ -205,6 +205,15 @@ async function runInternalProtocolServer(): Promise<void> {
       void session.handlePrompt(cmd.text);
     } else if (cmd.type === 'resume') {
       session.resume(cmd.messages);
+      // Restore the ContextManager so the StatusBar shows the correct %
+      // context used after resume. Without this, the meter starts at 0%
+      // until new turns accumulate entries.
+      if (cmd.contextEntries && cmd.contextEntries.length > 0) {
+        context.restore(cmd.contextEntries, cmd.contextBudgetTokens);
+        // Re-emit a fresh snapshot so the UI updates immediately rather
+        // than waiting for the next onContextUpdate fire.
+        session.emitContextSnapshot();
+      }
     }
   });
 }

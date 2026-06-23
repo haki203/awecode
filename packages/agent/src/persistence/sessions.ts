@@ -64,8 +64,39 @@ export interface SessionMeta {
   provider?: string;
 }
 
+/**
+ * Persisted form of a {@link ContextEntry}. Stored under
+ * `Session.contextEntries` so the StatusBar can rebuild the % context used
+ * meter accurately after resume, instead of always showing 0%.
+ *
+ * Kept in sync with `ContextEntry` in `@awecode/agent`. We define a fresh
+ * interface (rather than re-using `ContextEntry`) because:
+ *   1. Avoids a workspace cycle (`agent/persistence` → `agent/context`).
+ *   2. Survives schema drift between the persistence file format and the
+ *      in-memory `ContextEntry` shape if either evolves.
+ */
+export interface ContextEntryRecord {
+  id: string;
+  type: string;
+  path?: string;
+  lines?: { start: number; end: number };
+  content: string;
+  tokens: number;
+  addedAt: number;
+  addedBy: 'user' | 'agent';
+}
+
 export interface Session extends SessionMeta {
   messages: SessionMessage[];
+  /**
+   * Snapshot of the ContextManager's entries at save time. Optional so
+   * session JSON files written before this field was introduced (v0.1 and
+   * earlier) still load — callers fall back to reconstructing entries from
+   * `messages[]` when this is undefined.
+   */
+  contextEntries?: ContextEntryRecord[];
+  /** Snapshot of the model's context budget at save time. */
+  contextBudgetTokens?: number;
 }
 
 const SESSIONS_DIR = resolve(
@@ -156,9 +187,12 @@ export function renameSession(id: string, title: string): SessionMeta | null {
 }
 
 function stripMessages(s: Session): SessionMeta {
-  // Avoid leaking the full transcript to the sidebar list. Only metadata.
-  const { messages: _messages, ...meta } = s;
+  // Avoid leaking the full transcript + context snapshot to the sidebar
+  // list. Only metadata.
+  const { messages: _messages, contextEntries: _ctx, contextBudgetTokens: _cb, ...meta } = s;
   void _messages;
+  void _ctx;
+  void _cb;
   return meta as SessionMeta;
 }
 

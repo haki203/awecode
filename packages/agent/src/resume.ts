@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import type { ModelMessage } from 'ai';
-import type { SessionMessage } from './persistence/sessions.js';
+import type { SessionMessage, ContextEntryRecord } from './persistence/sessions.js';
+import type { ContextManager } from './context/manager.js';
 
 /**
  * Transform a persisted `Session.messages` array into the `ModelMessage[]`
@@ -135,4 +136,53 @@ function findMatchingResult(
     }
   }
   return null;
+}
+
+/**
+ * Rebuild a {@link ContextManager} from a persisted session so the StatusBar
+ * shows the correct % context used after resume (instead of always 0%).
+ *
+ * Two paths:
+ *
+ * 1. **Preferred** — `session.contextEntries` was persisted (v0.2+). We
+ *    hand the records straight to `ContextManager.restore`, preserving the
+ *    original token counts and entry types (file / diff / repo-map /
+ *    user-message / ...). This is lossless.
+ *
+ * 2. **Fallback** — session JSON was written by v0.1 or earlier, before
+ *    `contextEntries` existed. We reconstruct entries heuristically from
+ *    `session.messages[]`: user/assistant/tool roles map to their matching
+ *    entry types. We can't recover file / diff / repo-map entries because
+ *    SessionMessage doesn't distinguish them, but the reconstructed
+ *    user/assistant/tool entries are enough to give a useful meter reading
+ *    until the next turn refreshes the snapshot.
+ *
+ * Either way, existing entries in `cm` are cleared first so repeated calls
+ * (e.g. switching sessions twice) don't accumulate stale entries.
+ */
+export function rebuildContextFromSession(
+  session: { messages: SessionMessage[]; contextEntries?: ContextEntryRecord[]; contextBudgetTokens?: number },
+  cm: ContextManager,
+): void {
+  if (session.contextEntries && session.contextEntries.length > 0) {
+    cm.restore(session.contextEntries, session.contextBudgetTokens);
+    return;
+  }
+  // Fallback: reconstruct from messages. We don't know the original
+  // budget (it came from the active provider config at the time), so keep
+  // whatever the ContextManager was constructed with.
+  cm.clear();
+  for (const m of session.messages) {
+    if (m.role === 'user') {
+      cm.addUserMessage(m.content);
+    } else if (m.role === 'assistant') {
+      cm.addAssistantMessage(m.content);
+    } else if (m.role === 'tool' && !isToolCallMarker(m)) {
+      cm.addToolResult({
+        toolName: m.toolName ?? 'unknown',
+        content: m.content,
+      });
+    }
+    // role === 'error' → skip (UI-only, not real context)
+  }
 }

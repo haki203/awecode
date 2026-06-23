@@ -54,6 +54,12 @@ export function entryTypeGlyph(type: string): string {
       return 'ƒ';
     case 'command-output':
       return '▸';
+    case 'user-message':
+      return 'usr';
+    case 'assistant-message':
+      return 'ai';
+    case 'tool-result':
+      return 'tool';
     case 'diff':
       return 'Δ';
     case 'repo-map':

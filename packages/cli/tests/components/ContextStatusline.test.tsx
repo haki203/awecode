@@ -34,12 +34,34 @@ describe('ContextStatusline', () => {
       <ContextStatusline entries={[baseEntry]} used={500} budget={1000} />,
     );
     const frame = lastFrame() ?? '';
-    // The statusline shows the label, bar, percentage, token counts, and file count.
+    // The statusline shows the label, bar, percentage, token counts, and entry summary.
     expect(frame).toContain('ctx');
     expect(frame).toContain('50%');
-    expect(frame).toContain('1 files');
+    // 1 file entry, no chat turns → "1 file"
+    expect(frame).toContain('1 file');
     expect(frame).toContain('━'); // filled bar cells
     expect(frame).toContain('╌'); // empty bar cells
+  });
+
+  it('renders chat turns count when entries contain chat messages', () => {
+    const userMsg: ContextEntry = {
+      ...baseEntry,
+      id: '11111111-1111-1111-1111-111111111111',
+      type: 'user-message',
+      path: undefined,
+    };
+    const aiMsg: ContextEntry = {
+      ...baseEntry,
+      id: '22222222-2222-2222-2222-222222222222',
+      type: 'assistant-message',
+      path: undefined,
+    };
+    const { lastFrame } = render(
+      <ContextStatusline entries={[userMsg, aiMsg]} used={500} budget={1000} />,
+    );
+    const frame = lastFrame() ?? '';
+    // 1 user-message entry counts as 1 turn
+    expect(frame).toContain('1 turn');
   });
 
   it('formats large token counts with k suffix', () => {

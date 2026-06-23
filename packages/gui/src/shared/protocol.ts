@@ -42,13 +42,37 @@ export interface ContextEntrySnapshot {
   type: string;
   label: string;
   tokens?: number;
+  /**
+   * Full entry fields needed to reconstruct a `ContextEntry` after resume.
+   * Older emitters that don't populate these fields still work —
+   * `session-event-handler.ts` falls back to a stub when `content` is
+   * missing, but the main path (snapshotContext in protocol-session.ts)
+   * always fills them in.
+   */
+  id?: string;
+  content?: string;
+  path?: string;
+  lines?: { start: number; end: number };
+  addedAt?: number;
+  addedBy?: 'user' | 'agent';
 }
 
 export type GuiClientCommand =
   | { type: 'prompt'; text: string }
   | { type: 'abort' }
   | { type: 'exit' }
-  | { type: 'resume'; messages: import('ai').ModelMessage[] };
+  | {
+      type: 'resume';
+      messages: import('ai').ModelMessage[];
+      /**
+       * Persisted context snapshot to restore into the new child's
+       * ContextManager so the StatusBar shows the correct % context used
+       * after resume. Optional for backward compatibility with emitters
+       * that don't populate it (older bridges).
+       */
+      contextEntries?: ContextEntryRecord[];
+      contextBudgetTokens?: number;
+    };
 
 // --- Session history (conversation list) -----------------------------------
 
@@ -71,6 +95,20 @@ export interface SessionMeta {
   provider?: string;
 }
 
+export interface ContextEntryRecord {
+  id: string;
+  type: string;
+  path?: string;
+  lines?: { start: number; end: number };
+  content: string;
+  tokens: number;
+  addedAt: number;
+  addedBy: 'user' | 'agent';
+}
+
 export interface Session extends SessionMeta {
   messages: SessionMessage[];
+  /** Optional context snapshot — see persistence/sessions.ts for rationale. */
+  contextEntries?: ContextEntryRecord[];
+  contextBudgetTokens?: number;
 }

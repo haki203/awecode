@@ -46,6 +46,23 @@ export function ContextStatusline({ entries, used, budget }: Props) {
   const bar =
     '━'.repeat(Math.min(filled, 10)) + '╌'.repeat(Math.max(0, 10 - filled));
 
+  // Right-hand summary: show conversation turn count for chat entries, or
+  // file count when explicit files have been added. Distinct from "entries"
+  // because chat turns (user-message / assistant-message / tool-result)
+  // dominate normal sessions — "3 turns" reads better than "9 entries".
+  const chatTurns = entries.filter((e) => e.type === 'user-message').length;
+  const fileCount = entries.filter((e) => e.type === 'file').length;
+  let summaryLabel: string;
+  if (chatTurns > 0) {
+    const parts = [`${chatTurns} turn${chatTurns === 1 ? '' : 's'}`];
+    if (fileCount > 0) parts.push(`${fileCount} file${fileCount === 1 ? '' : 's'}`);
+    summaryLabel = parts.join(' · ');
+  } else if (fileCount > 0) {
+    summaryLabel = `${fileCount} file${fileCount === 1 ? '' : 's'}`;
+  } else {
+    summaryLabel = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`;
+  }
+
   return (
     <Box gap={1}>
       <Text color={colors.muted}>ctx</Text>
@@ -57,7 +74,7 @@ export function ContextStatusline({ entries, used, budget }: Props) {
         {formatTokens(used)}/{formatTokens(budget)}
       </Text>
       <Text color={colors.muted}>·</Text>
-      <Text color={colors.muted}>{entries.length} files</Text>
+      <Text color={colors.muted}>{summaryLabel}</Text>
     </Box>
   );
 }

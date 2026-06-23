@@ -20,6 +20,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { applyEvent, resumeFromMessages } from '@awecode/agent';
+import type { ContextEntryRecord } from '../shared/protocol.js';
 import type { ModelMessage } from 'ai';
 import type { GuiAgentEvent, GuiClientCommand } from '../shared/protocol.js';
 import {
@@ -123,6 +124,15 @@ class AgentBridge {
    */
   private pendingResume: ModelMessage[] | null = null;
   /**
+   * Persisted ContextEntry snapshot to ship alongside `pendingResume`.
+   * Without this, the resumed child would start with an empty
+   * ContextManager and the StatusBar would show 0% until new turns
+   * accumulate entries. Populated by switchTo(); flushed in start().
+   */
+  private pendingResumeContext:
+    | { entries: ContextEntryRecord[]; budgetTokens?: number }
+    | null = null;
+  /**
    * Workspace the agent currently operates in. Read from the workspace
    * store at startup, mutated when the user picks a different folder.
    * Drives the child process's cwd.
@@ -153,6 +163,7 @@ class AgentBridge {
   switchWorkspace(newCwd: string): void {
     this.cwd = newCwd;
     this.pendingResume = null;
+    this.pendingResumeContext = null;
     this.dispose();
     this.session = null;
     this.start();
@@ -220,11 +231,19 @@ class AgentBridge {
     // If we're resuming a persisted session, push its transcript into the
     // fresh child via the 'resume' protocol command. The child's
     // ProtocolSession seeds its liveMessages so the next prompt sees the
-    // full prior context.
+    // full prior context. We also ship the persisted context snapshot so
+    // the child's ContextManager starts non-empty and the StatusBar shows
+    // the correct % context used right away.
     if (this.pendingResume && this.pendingResume.length > 0) {
-      const cmd: GuiClientCommand = { type: 'resume', messages: this.pendingResume };
+      const cmd: GuiClientCommand = {
+        type: 'resume',
+        messages: this.pendingResume,
+        contextEntries: this.pendingResumeContext?.entries,
+        contextBudgetTokens: this.pendingResumeContext?.budgetTokens,
+      };
       this.child?.stdin.write(JSON.stringify(cmd) + '\n');
       this.pendingResume = null;
+      this.pendingResumeContext = null;
     }
   }
 
@@ -253,8 +272,18 @@ class AgentBridge {
     this.session = loaded;
     // Transform the persisted transcript into ModelMessage[] for the
     // fresh child process. Stored on pendingResume and flushed in start()
-    // once the new child's stdin is alive.
+    // once the new child's stdin is alive. Also ship the persisted
+    // context snapshot so the child's ContextManager restores to the
+    // same meter reading as when the session was last saved.
     this.pendingResume = resumeFromMessages(loaded.messages);
+    if (loaded.contextEntries && loaded.contextEntries.length > 0) {
+      this.pendingResumeContext = {
+        entries: loaded.contextEntries,
+        budgetTokens: loaded.contextBudgetTokens,
+      };
+    } else {
+      this.pendingResumeContext = null;
+    }
     this.start();
     return stripMessages(loaded);
   }
@@ -262,6 +291,7 @@ class AgentBridge {
   /** Start a brand new session (sidebar "New chat" button). */
   newSession(): void {
     this.pendingResume = null;
+    this.pendingResumeContext = null;
     this.dispose();
     this.session = null;
     this.start();

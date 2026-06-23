@@ -32,7 +32,7 @@ export function ContextPanel({ entries, totalTokens, budget }: Props) {
 
       {showCompactionHint && (
         <Text color="yellow" dimColor>
-          [auto-compact at {pct}% — /smol to trigger manually]
+          [auto-compact at {pct}% — /compact to trigger manually]
         </Text>
       )}
 

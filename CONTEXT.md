@@ -53,7 +53,7 @@ The mechanism by which the agent announces which Workflow (if any) to start. Don
 _Avoid_: classifier, router
 
 **Compaction**:
-The process of reducing conversation history size by LLM-based summarization. Triggered automatically at 85% (moderate) or 95% (severe) of context budget, or manually via `/smol` slash command. Preserves original task, currently-edited files, last 5 turns, workflow artifact references; discards verbose tool output and redundant reads.
+The process of reducing conversation history size by LLM-based summarization. Triggered automatically at 85% (moderate) or 95% (severe) of context budget, or manually via `/compact` slash command (aliases: `/smol`, `/condense`). Preserves original task, currently-edited files, last 5 turns, workflow artifact references; discards verbose tool output and redundant reads.
 _Avoid_: compression (overloaded with gzip), summarization (too generic — Compaction is the specific context-window operation)
 
 ## Relationships

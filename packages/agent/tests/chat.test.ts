@@ -134,4 +134,80 @@ describe('runChatLoop', () => {
 
     expect(doneSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('tracks user prompt + assistant reply in ContextManager (fixes "context stuck at 0%" bug)', async () => {
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Hello world!'));
+
+    const ctx = new ContextManager(100_000);
+    await runChatLoop(
+      [{ role: 'user', content: 'hi there' }],
+      { config: mockConfig, context: ctx },
+    );
+
+    // 2 entries: user-message + assistant-message
+    expect(ctx.entryCount).toBe(2);
+    const types = ctx.snapshot().map((e) => e.type);
+    expect(types).toContain('user-message');
+    expect(types).toContain('assistant-message');
+    // totalTokens must be > 0 now — this is the assertion that would have
+    // failed before the wire-up fix (entries stayed empty → 0 / 100k = 0%).
+    expect(ctx.totalTokens).toBeGreaterThan(0);
+    expect(ctx.utilization).toBeGreaterThan(0);
+  });
+
+  it('tracks tool results in ContextManager when tools are invoked', async () => {
+    mockStreamText.mockResolvedValueOnce(
+      makeStreamResponse('', [
+        { toolName: 'read_file', args: { path: '/tmp/test.ts' } },
+      ]),
+    );
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done'));
+
+    const ctx = new ContextManager(100_000);
+    await runChatLoop(
+      [{ role: 'user', content: 'read file' }],
+      { config: mockConfig, context: ctx },
+    );
+
+    const types = ctx.snapshot().map((e) => e.type);
+    expect(types).toContain('user-message');
+    expect(types).toContain('assistant-message');
+    expect(types).toContain('tool-result');
+    expect(ctx.totalTokens).toBeGreaterThan(0);
+  });
+
+  it('fires onContextUpdate after each entry is added (mid-turn UI refresh)', async () => {
+    mockStreamText.mockResolvedValueOnce(
+      makeStreamResponse('', [
+        { toolName: 'read_file', args: { path: '/tmp/test.ts' } },
+      ]),
+    );
+    mockStreamText.mockResolvedValueOnce(makeStreamResponse('Done'));
+
+    const ctx = new ContextManager(100_000);
+    const snapshots: Array<{ totalTokens: number; entryCount: number }> = [];
+    await runChatLoop(
+      [{ role: 'user', content: 'read file' }],
+      {
+        config: mockConfig,
+        context: ctx,
+        onContextUpdate: (s) => snapshots.push({
+          totalTokens: s.totalTokens,
+          entryCount: s.entryCount,
+        }),
+      },
+    );
+
+    // Expected fire order: user-message (iter 0 only), assistant-message
+    // (iter 0), tool-result (iter 0), assistant-message (iter 1).
+    // So at least 4 snapshots, each strictly increasing in entryCount.
+    expect(snapshots.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < snapshots.length; i++) {
+      expect(snapshots[i]!.entryCount).toBeGreaterThanOrEqual(snapshots[i - 1]!.entryCount);
+    }
+    // Final snapshot reflects the fully-populated ContextManager.
+    const last = snapshots[snapshots.length - 1]!;
+    expect(last.entryCount).toBe(ctx.entryCount);
+    expect(last.totalTokens).toBe(ctx.totalTokens);
+  });
 });

@@ -78,6 +78,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   auto-compaction work, and `toMessages()` now emits per-type headers
   (`User`, `Assistant`, `Tool result`, etc.) instead of a generic
   `[type]` tag.
+- **GUI chat density tightened.** Reduced line-height (`.md` 1.6 → 1.35,
+  `.msg` 1.55 → 1.4), paragraph margin (`.md-p` 6px → 2px), list margin
+  (`.md-ul/.md-ol` 6px → 2px), chat-view gap (10px → 4px), and horizontal
+  padding on `.app-body` / `.prompt-input` / `.status-bar` /
+  `.workflow-indicator` (20px → 12px). Web PWA auto-inherits via
+  `@import` of `packages/gui/src/renderer/src/styles.css`.
+
+### Added
+- **`onContextUpdate` callback on `ChatLoopOptions`** — fires whenever
+  `runChatLoop` pushes a new entry (user-message / assistant-message /
+  tool-result) into the `ContextManager`. The CLI bumps a `contextVersion`
+  state to force `ContextStatusline` / `ContextOverlay` to re-render
+  mid-turn; `ProtocolSession` emits a fresh `context_snapshot` event so
+  GUI and Web PWA StatusBars update live as the reply streams, not just
+  once at `onDone`. This closes the gap that made the meter appear
+  frozen even after the wire-up fix.
+- **Context state is now persisted across sessions.** The
+  `context_snapshot` event (carrying `entries`, `totalTokens`,
+  `budgetTokens`) is folded into the session JSON by
+  `session-event-handler.ts`, so closing and reopening a session no
+  longer resets the % context used meter to 0%.
+  - New `ContextEntryRecord` interface + optional `Session.contextEntries`
+    / `contextBudgetTokens` fields (backward-compatible with v0.1 JSONs).
+  - `ContextManager` gained `restore()` and `toRecords()` methods.
+  - `ContextEntrySnapshot` wire format extended with full-entry fields
+    (`content`, `id`, `path`, `lines`, `addedAt`, `addedBy`) so the
+    persisted snapshot round-trips losslessly.
+  - `rebuildContextFromSession(session, cm)` helper in
+    `@awecode/agent` rebuilds a ContextManager from a persisted session.
+    Falls back to reconstructing from `messages[]` for legacy sessions
+    (loses file/diff entries but preserves user/assistant/tool-result).
+  - GUI Desktop `AgentBridge.switchTo` and Web `ws-bridge.ts` both
+    restore the ContextManager on resume so the StatusBar shows the
+    correct % immediately after switching sessions.
 
 ### Added
 - **`onContextUpdate` callback on `ChatLoopOptions`** — fires whenever

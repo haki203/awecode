@@ -74,10 +74,57 @@ describe('applyEvent', () => {
     expect(s.messages[0]!.content).toBe('boom');
   });
 
-  it('context_snapshot does not mutate messages', () => {
+  it('context_snapshot persists entries into session.contextEntries', () => {
     const s: Session = { ...emptySession, messages: [] };
-    applyEvent(s, { type: 'context_snapshot', entries: [], totalTokens: 0, budgetTokens: 1000 });
-    expect(s.messages).toHaveLength(0);
+    applyEvent(s, {
+      type: 'context_snapshot',
+      entries: [
+        {
+          type: 'user-message',
+          label: 'user-message',
+          tokens: 5,
+          id: 'abc',
+          content: 'hello',
+          addedAt: 100,
+          addedBy: 'user',
+        },
+        {
+          type: 'assistant-message',
+          label: 'assistant-message',
+          tokens: 7,
+          id: 'def',
+          content: 'hi there',
+          addedAt: 101,
+          addedBy: 'agent',
+        },
+      ],
+      totalTokens: 12,
+      budgetTokens: 100_000,
+    });
+    expect(s.messages).toHaveLength(0); // still no message mutation
+    expect(s.contextEntries).toHaveLength(2);
+    expect(s.contextEntries![0]!.type).toBe('user-message');
+    expect(s.contextEntries![0]!.content).toBe('hello');
+    expect(s.contextEntries![0]!.tokens).toBe(5);
+    expect(s.contextEntries![1]!.addedBy).toBe('agent');
+    expect(s.contextBudgetTokens).toBe(100_000);
+  });
+
+  it('context_snapshot handles missing optional fields with fallbacks', () => {
+    const s: Session = { ...emptySession, messages: [] };
+    applyEvent(s, {
+      type: 'context_snapshot',
+      entries: [
+        // Legacy snapshot — only type/label/tokens.
+        { type: 'snippet', label: 'snippet:1-10', tokens: 3 },
+      ],
+      totalTokens: 3,
+      budgetTokens: 50_000,
+    });
+    expect(s.contextEntries).toHaveLength(1);
+    expect(s.contextEntries![0]!.id).toBe('restored');
+    expect(s.contextEntries![0]!.content).toBe('snippet:1-10'); // falls back to label
+    expect(s.contextEntries![0]!.addedBy).toBe('agent');
   });
 
   it('intent does not mutate messages', () => {

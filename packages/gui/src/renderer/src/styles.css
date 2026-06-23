@@ -95,7 +95,7 @@ button:disabled {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 20px;
+  padding: 0 12px;
 }
 
 /* ===== Sidebar ===== */
@@ -301,7 +301,7 @@ button:disabled {
   padding: 16px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
 }
 
 .chat-empty {
@@ -326,7 +326,7 @@ button:disabled {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .msg-glyph {
@@ -390,7 +390,7 @@ button:disabled {
 /* ===== Prompt input ===== */
 .prompt-input {
   border-top: 1px solid var(--border);
-  padding: 12px 20px;
+  padding: 12px 12px;
   background: var(--bg-elev);
   display: flex;
   flex-direction: column;
@@ -429,6 +429,16 @@ button:disabled {
 .btn-send {
   border-color: var(--c-accent);
   color: var(--c-accent);
+  /* Icon-only round send button (▶ rotated to point up like a paper plane). */
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .btn-send:hover:not(:disabled) {
@@ -436,9 +446,25 @@ button:disabled {
   color: var(--bg);
 }
 
+/* Rotate the triangle so its apex points up — reads as "send". */
+.btn-send-glyph {
+  display: inline-block;
+  transform: rotate(-90deg);
+}
+
 .btn-abort {
   border-color: var(--c-danger);
   color: var(--c-danger);
+  /* Match the round send button shape so the layout doesn't jump. */
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* ===== Status bar ===== */
@@ -447,19 +473,33 @@ button:disabled {
   height: 28px;
   border-top: 1px solid var(--border);
   background: var(--bg-elev);
-  padding: 0 20px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   font-size: 12px;
   color: var(--c-text-dim);
 }
 
-.status-left,
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.status-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
 .status-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .status-bar .brand {
@@ -490,18 +530,23 @@ button:disabled {
   animation: blink 1.2s steps(2) infinite;
 }
 
+.status-bar .status-transport {
+  color: var(--c-warn);
+  font-style: italic;
+}
+
 .ctx-meter {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-width: 140px;
+  min-width: 96px;
 }
 
 .ctx-meter .ctx-bar {
   display: inline-block;
   height: 4px;
-  width: 60px;
+  width: 48px;
   background: transparent;
   border-radius: 2px;
   position: relative;
@@ -523,7 +568,7 @@ button:disabled {
 /* ===== Workflow indicator ===== */
 .workflow-indicator {
   flex-shrink: 0;
-  padding: 6px 20px;
+  padding: 6px 12px;
   background: var(--bg-elev-2);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
@@ -607,7 +652,7 @@ button:disabled {
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Consolas,
     monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.35;
   color: var(--c-text);
 }
 
@@ -641,12 +686,12 @@ button:disabled {
 }
 
 .md-p {
-  margin: 6px 0;
+  margin: 2px 0;
 }
 
 .md-ul,
 .md-ol {
-  margin: 6px 0;
+  margin: 2px 0;
   padding-left: 22px;
 }
 
@@ -788,6 +833,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
   text-align: center;
   padding: 20px;
   color: var(--c-danger);

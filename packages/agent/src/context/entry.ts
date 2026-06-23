@@ -20,6 +20,9 @@ export type ContextEntryType =
   | 'snippet'
   | 'symbol'
   | 'command-output'
+  | 'user-message'
+  | 'assistant-message'
+  | 'tool-result'
   | 'diff'
   | 'repo-map';
 
@@ -68,6 +71,33 @@ export function createCommandOutputEntry(args: {
     type: 'command-output',
     content: args.content,
     addedBy: args.addedBy ?? 'agent',
+  });
+}
+
+export function createUserMessageEntry(content: string): ContextEntry {
+  return createEntry({
+    type: 'user-message',
+    content,
+    addedBy: 'user',
+  });
+}
+
+export function createAssistantMessageEntry(content: string): ContextEntry {
+  return createEntry({
+    type: 'assistant-message',
+    content,
+    addedBy: 'agent',
+  });
+}
+
+export function createToolResultEntry(args: {
+  toolName: string;
+  content: string;
+}): ContextEntry {
+  return createEntry({
+    type: 'tool-result',
+    content: `[${args.toolName}]\n${args.content}`,
+    addedBy: 'agent',
   });
 }
 

@@ -28,6 +28,90 @@ describe('ContextManager', () => {
     expect(cm.snapshot()[0]!.type).toBe('command-output');
   });
 
+  it('addUserMessage / addAssistantMessage track chat turns', () => {
+    const cm = new ContextManager(100_000);
+    cm.addUserMessage('hello');
+    cm.addAssistantMessage('hi there');
+    expect(cm.entryCount).toBe(2);
+    expect(cm.snapshot()[0]!.type).toBe('user-message');
+    expect(cm.snapshot()[0]!.addedBy).toBe('user');
+    expect(cm.snapshot()[1]!.type).toBe('assistant-message');
+    expect(cm.snapshot()[1]!.addedBy).toBe('agent');
+    expect(cm.totalTokens).toBeGreaterThan(0);
+  });
+
+  it('addToolResult records tool result entry', () => {
+    const cm = new ContextManager();
+    cm.addToolResult({ toolName: 'read_file', content: 'file contents here' });
+    const entry = cm.snapshot()[0]!;
+    expect(entry.type).toBe('tool-result');
+    expect(entry.content).toContain('read_file');
+    expect(entry.content).toContain('file contents here');
+  });
+
+  it('clear() empties entries', () => {
+    const cm = new ContextManager();
+    cm.addUserMessage('x');
+    cm.addAssistantMessage('y');
+    expect(cm.entryCount).toBe(2);
+    cm.clear();
+    expect(cm.entryCount).toBe(0);
+    expect(cm.totalTokens).toBe(0);
+  });
+
+  it('restore() replaces entries and updates budget', () => {
+    const cm = new ContextManager(100_000);
+    cm.addUserMessage('stale');
+    expect(cm.entryCount).toBe(1);
+
+    const records = [
+      {
+        id: 'rec-1',
+        type: 'user-message' as const,
+        content: 'hello',
+        tokens: 5,
+        addedAt: 100,
+        addedBy: 'user' as const,
+      },
+      {
+        id: 'rec-2',
+        type: 'assistant-message' as const,
+        content: 'hi there',
+        tokens: 7,
+        addedAt: 101,
+        addedBy: 'agent' as const,
+      },
+    ];
+    cm.restore(records, 200_000);
+
+    // Stale entry was dropped — restore replaces, not appends.
+    expect(cm.entryCount).toBe(2);
+    expect(cm.snapshot()[0]!.id).toBe('rec-1');
+    expect(cm.snapshot()[1]!.content).toBe('hi there');
+    // Budget was updated.
+    expect(cm.budgetTokens).toBe(200_000);
+    expect(cm.totalTokens).toBe(12); // 5 + 7 from persisted tokens
+  });
+
+  it('restore() without budget keeps existing budget', () => {
+    const cm = new ContextManager(50_000);
+    cm.restore([
+      { id: 'x', type: 'user-message', content: 'a', tokens: 1, addedAt: 1, addedBy: 'user' },
+    ]);
+    expect(cm.budgetTokens).toBe(50_000);
+  });
+
+  it('toRecords() returns shallow clones (mutations do not leak back)', () => {
+    const cm = new ContextManager();
+    cm.addUserMessage('original');
+    const records = cm.toRecords();
+    expect(records).toHaveLength(1);
+    // Mutate the cloned record.
+    records[0]!.content = 'mutated';
+    // Internal state is unaffected.
+    expect(cm.snapshot()[0]!.content).toBe('original');
+  });
+
   it('removeEntry removes by id', () => {
     const cm = new ContextManager();
     const entry = cm.addFile({

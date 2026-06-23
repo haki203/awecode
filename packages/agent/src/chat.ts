@@ -38,8 +38,22 @@ export interface ChatLoopOptions {
   onToolResult?: (name: string, result: unknown) => void;
   onDiffDetected?: (diff: string) => void;
   onIntentDeclared?: (intent: IntentDeclaration) => void;
+  /**
+   * Fired whenever a new entry is pushed into the ContextManager
+   * (user-message, assistant-message, tool-result). Subscribers use this
+   * to refresh context-meter UIs mid-turn — without it, statusline/overlay
+   * would stay stale until `onDone` fires. The snapshot reflects the
+   * ContextManager state at the moment of the callback.
+   */
+  onContextUpdate?: (snapshot: ContextUpdateSnapshot) => void;
   /** Called exactly once when the loop exits (normally, via abort, or via throw). */
   onDone?: () => void;
+}
+
+export interface ContextUpdateSnapshot {
+  totalTokens: number;
+  budgetTokens: number;
+  entryCount: number;
 }
 
 export const DEFAULT_SYSTEM_PROMPT = `You are awecode, a CLI coding agent.
@@ -159,6 +173,19 @@ export async function runChatLoop(
     const tools = buildToolSet(listToolDefinitions());
     const maxIter = opts.maxIterations ?? 20;
 
+    /**
+     * Snapshot the ContextManager's meter fields and fire `onContextUpdate`.
+     * Centralised so every entry-appending site guarantees the UI hears the
+     * new numbers without duplicating the read logic.
+     */
+    const fireContextUpdate = () => {
+      opts.onContextUpdate?.({
+        totalTokens: opts.context.totalTokens,
+        budgetTokens: opts.context.budgetTokens,
+        entryCount: opts.context.entryCount,
+      });
+    };
+
     for (let iter = 0; iter < maxIter; iter++) {
       if (opts.abortSignal?.aborted) break;
 
@@ -190,6 +217,22 @@ export async function runChatLoop(
       opts.onIntentDeclared?.(intent);
 
       messages.push({ role: 'assistant', content: assistantText });
+      // Track the assistant's reply in the ContextManager so the statusline %
+      // reflects the live conversation. The first iteration also seeds the
+      // user's prompt (caller does not have a hook for this), subsequent
+      // iterations only add the assistant reply since the user message was
+      // already tracked on iteration 0.
+      if (iter === 0) {
+        const firstUser = messages.find(
+          (m) => m.role === 'user' && typeof m.content === 'string',
+        );
+        if (firstUser && typeof firstUser.content === 'string') {
+          opts.context.addUserMessage(firstUser.content);
+          fireContextUpdate();
+        }
+      }
+      opts.context.addAssistantMessage(assistantText);
+      fireContextUpdate();
 
       const toolCalls = await result.toolCalls;
       if (!toolCalls || toolCalls.length === 0) {
@@ -204,6 +247,12 @@ export async function runChatLoop(
           arguments: normalized.arguments,
         });
         opts.onToolResult?.(normalized.name, toolResult);
+        const toolResultStr = JSON.stringify(toolResult);
+        opts.context.addToolResult({
+          toolName: normalized.name,
+          content: toolResultStr,
+        });
+        fireContextUpdate();
         // AI SDK v6 models a tool message as `ToolModelMessage` whose content is
         // an array of `ToolResultPart` entries (not a bare string). Each part's
         // `output` is a `ToolResultOutput` discriminated union; we serialise the
@@ -220,7 +269,7 @@ export async function runChatLoop(
               type: 'tool-result',
               toolCallId,
               toolName: normalized.name,
-              output: { type: 'text', value: JSON.stringify(toolResult) },
+              output: { type: 'text', value: toolResultStr },
             },
           ],
         });

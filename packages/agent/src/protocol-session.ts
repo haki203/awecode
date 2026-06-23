@@ -65,6 +65,13 @@ export interface ProtocolSession {
    * AgentBridge.switchTo sends resume right after spawning the child).
    */
   resume(messages: ModelMessage[]): void;
+  /**
+   * Emit a `context_snapshot` event with the ContextManager's current
+   * state. Callers use this to force the StatusBar to refresh after
+   * mutating the ContextManager out-of-band (e.g. restoring entries from
+   * a persisted session during resume).
+   */
+  emitContextSnapshot(): void;
 }
 
 export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSession {
@@ -85,6 +92,15 @@ export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSes
         e.path ??
         (e.lines ? `${e.type}:${e.lines.start}-${e.lines.end}` : e.type),
       tokens: e.tokens,
+      // Full-entry fields for session persistence + resume rebuild.
+      // Without these, the StatusBar would show 0% after resume because
+      // the ContextManager could only be re-seeded with empty entries.
+      id: e.id,
+      content: e.content,
+      path: e.path,
+      lines: e.lines,
+      addedAt: e.addedAt,
+      addedBy: e.addedBy,
     }));
     return {
       entries,
@@ -207,5 +223,9 @@ export function createProtocolSession(opts: ProtocolSessionOptions): ProtocolSes
     }
   }
 
-  return { handlePrompt, abort, dispose, resume };
+  function emitContextSnapshot(): void {
+    emit({ type: 'context_snapshot', ...snapshotContext() });
+  }
+
+  return { handlePrompt, abort, dispose, resume, emitContextSnapshot };
 }

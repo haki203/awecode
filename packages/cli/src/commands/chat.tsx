@@ -92,6 +92,13 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
   // or `c` again closes it. Inspired by Codex / OpenCode, which keep context
   // as a small status hint and surface details only on request.
   const [showContext, setShowContext] = useState(false);
+  // ContextManager is a mutable singleton — React doesn't see mutations on
+  // it, so `ContextStatusline` would stay stale until some unrelated state
+  // setter happens to re-render. `runChatLoop` fires `onContextUpdate`
+  // after every new entry (user-message / assistant-message / tool-result),
+  // and we bump this counter to force the statusline + overlay to pick up
+  // the new `context.totalTokens` mid-turn (not just at onDone).
+  const [, setContextVersion] = useState(0);
   // Slash command context. projectRoot is resolved from cwd at render time;
   // userSkillsDir is left empty until config exposes a skills path.
   const slashCtx: SlashContext = {
@@ -132,7 +139,7 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
     const trimmed = userInput.trim();
     if (trimmed === '') return;
     // Slash commands short-circuit before any LLM call. They run even while a
-    // stream is in flight so the user can /smol or /tokens mid-response.
+    // stream is in flight so the user can /compact or /tokens mid-response.
     const slashHandled = await dispatchSlash(trimmed, slashCtx);
     if (slashHandled) {
       setInputKey((k) => k + 1);
@@ -227,6 +234,13 @@ function ChatApp({ context, config, initialPrompt }: ChatAppProps) {
             setWorkflow(null);
             setPhase(null);
           }
+        },
+        onContextUpdate: () => {
+          // Bump an unused state slot so the statusline + overlay re-read
+          // `context.totalTokens` from the mutated singleton. Without this,
+          // the meter stays frozen until `setIsStreaming(false)` fires at
+          // the end of the turn.
+          setContextVersion((v) => v + 1);
         },
       });
     } catch (err) {

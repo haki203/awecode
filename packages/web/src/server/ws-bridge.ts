@@ -78,6 +78,27 @@ export function attachWsServer(server: Server, wss: WebSocketServer, ctx: WsCtx)
       if (existing) {
         sessionRecord = existing;
         initialMessages = resumeFromMessages(existing.messages);
+        // Restore the ContextManager so the StatusBar shows the correct
+        // % context used for this session right after WS connects, instead
+        // of starting from 0%. The next emitted context_snapshot will
+        // carry the restored values to the client.
+        if (existing.contextEntries && existing.contextEntries.length > 0) {
+          ctx.context.restore(existing.contextEntries, existing.contextBudgetTokens);
+        } else {
+          // Legacy session JSON (pre-v0.2): reconstruct what we can from
+          // messages[] so the meter isn't stuck at 0%.
+          ctx.context.clear();
+          for (const m of existing.messages) {
+            if (m.role === 'user') ctx.context.addUserMessage(m.content);
+            else if (m.role === 'assistant') ctx.context.addAssistantMessage(m.content);
+            else if (m.role === 'tool' && !m.content.startsWith('call ')) {
+              ctx.context.addToolResult({
+                toolName: m.toolName ?? 'unknown',
+                content: m.content,
+              });
+            }
+          }
+        }
       } else {
         // Session not found — fall back to creating a new one.
         sessionRecord = {
