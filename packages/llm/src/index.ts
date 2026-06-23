@@ -35,6 +35,14 @@ export { createProvider } from './providers.js';
 export { chat, streamChat } from './chat.js';
 export type { ChatOptions, ChatResult } from './chat.js';
 export {
+  buildToolSet,
+  normalizeToolCall,
+} from './adapter.js';
+export type {
+  AdapterToolDefinition,
+  NormalizedToolCall,
+} from './adapter.js';
+export {
   resolveContextBudget,
   resolveProviderContextWindow,
   DEFAULT_CONTEXT_WINDOW_FALLBACK,
