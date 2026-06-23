@@ -54,4 +54,53 @@ export default [
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
+  // Enforce the @awecode/llm chokepoint (ADR-0009): no package other than
+  // @awecode/llm may import runtime symbols from the Vercel AI SDK. Type-only
+  // imports (`import type { ModelMessage } from 'ai'`) are permitted everywhere
+  // because they carry no runtime behaviour and are erased at compile time.
+  // Runtime imports (`import { streamText } from 'ai'`) outside packages/llm
+  // fail the build. See docs/adr/0009-llm-single-chokepoint-for-ai-sdk.md.
+  {
+    files: ['**/*.{ts,tsx}'],
+    ignores: ['packages/llm/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'ai',
+              message:
+                "Import 'ai' runtime symbols through @awecode/llm instead (ADR-0009). Type-only imports (`import type ... from 'ai'`) are allowed.",
+              allowTypeImports: true,
+            },
+            {
+              name: '@ai-sdk/anthropic',
+              message:
+                'Provider factories live in @awecode/llm only (ADR-0009). Use createProvider from @awecode/llm.',
+              allowTypeImports: true,
+            },
+            {
+              name: '@ai-sdk/openai',
+              message:
+                'Provider factories live in @awecode/llm only (ADR-0009). Use createProvider from @awecode/llm.',
+              allowTypeImports: true,
+            },
+            {
+              name: '@ai-sdk/google',
+              message:
+                'Provider factories live in @awecode/llm only (ADR-0009). Use createProvider from @awecode/llm.',
+              allowTypeImports: true,
+            },
+            {
+              name: 'ai-sdk-ollama',
+              message:
+                'Provider factories live in @awecode/llm only (ADR-0009). Use createProvider from @awecode/llm.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
