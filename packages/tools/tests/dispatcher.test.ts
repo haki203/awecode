@@ -27,15 +27,16 @@ describe('tool registry', () => {
     expect(names).toContain('search_files');
     expect(names).toContain('shell_exec');
     expect(names).toContain('web_fetch');
+    expect(names).toContain('web_search');
     expect(names).toContain('browser_session_open');
     expect(names).toContain('browser_navigate');
     expect(names).toContain('browser_screenshot');
-    expect(names).toHaveLength(13);
+    expect(names).toHaveLength(14);
   });
 
   it('listToolDefinitions returns all definitions', () => {
     const defs = listToolDefinitions();
-    expect(defs).toHaveLength(13);
+    expect(defs).toHaveLength(14);
     expect(defs.map((d) => d.name).sort()).toEqual([
       'browser_click',
       'browser_navigate',
@@ -50,6 +51,7 @@ describe('tool registry', () => {
       'search_files',
       'shell_exec',
       'web_fetch',
+      'web_search',
     ]);
   });
 });

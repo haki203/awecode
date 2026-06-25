@@ -30,6 +30,19 @@ export type { ShellExecArgs } from './shell/exec.js';
 export { webFetchTool, webFetchDef } from './web/fetch.js';
 export type { WebFetchArgs } from './web/fetch.js';
 export {
+  webSearchTool,
+  webSearchDef,
+  TavilyProvider,
+  getWebSearchProvider,
+  setWebSearchProvider,
+} from './web/search.js';
+export type {
+  WebSearchArgs,
+  WebSearchProvider,
+  WebSearchResponse,
+  WebSearchResult,
+} from './web/search.js';
+export {
   browserSessionOpenTool,
   browserSessionCloseTool,
   browserNavigateTool,
@@ -76,6 +89,8 @@ import { shellExecTool, shellExecDef } from './shell/exec.js';
 import type { ShellExecArgs } from './shell/exec.js';
 import { webFetchTool, webFetchDef } from './web/fetch.js';
 import type { WebFetchArgs } from './web/fetch.js';
+import { webSearchTool, webSearchDef } from './web/search.js';
+import type { WebSearchArgs } from './web/search.js';
 import {
   browserSessionOpenDef,
   browserSessionCloseDef,
@@ -155,6 +170,10 @@ export const TOOL_REGISTRY: Record<
   [webFetchDef.name]: {
     def: webFetchDef,
     handler: adaptToolHandler<WebFetchArgs>(webFetchTool),
+  },
+  [webSearchDef.name]: {
+    def: webSearchDef,
+    handler: adaptToolHandler<WebSearchArgs>(webSearchTool),
   },
   ...browserRegistryEntries,
 };
