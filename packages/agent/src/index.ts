@@ -21,6 +21,7 @@ export {
   createAssistantMessageEntry,
   createToolResultEntry,
   createDiffEntry,
+  createWebEntry,
 } from './context/entry.js';
 
 export { ContextManager } from './context/manager.js';

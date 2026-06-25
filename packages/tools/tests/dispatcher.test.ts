@@ -20,23 +20,25 @@ import {
 } from '../src/index.js';
 
 describe('tool registry', () => {
-  it('registers 4 built-in tools', () => {
+  it('registers 5 built-in tools', () => {
     const names = Object.keys(TOOL_REGISTRY);
     expect(names).toContain('read_file');
     expect(names).toContain('list_files');
     expect(names).toContain('search_files');
     expect(names).toContain('shell_exec');
-    expect(names).toHaveLength(4);
+    expect(names).toContain('web_fetch');
+    expect(names).toHaveLength(5);
   });
 
   it('listToolDefinitions returns all definitions', () => {
     const defs = listToolDefinitions();
-    expect(defs).toHaveLength(4);
+    expect(defs).toHaveLength(5);
     expect(defs.map((d) => d.name).sort()).toEqual([
       'list_files',
       'read_file',
       'search_files',
       'shell_exec',
+      'web_fetch',
     ]);
   });
 });

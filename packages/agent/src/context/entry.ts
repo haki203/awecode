@@ -24,13 +24,15 @@ export type ContextEntryType =
   | 'assistant-message'
   | 'tool-result'
   | 'diff'
-  | 'repo-map';
+  | 'repo-map'
+  | 'web';
 
 export interface ContextEntry {
   id: string;
   type: ContextEntryType;
   path?: string;
   lines?: { start: number; end: number };
+  url?: string;
   content: string;
   tokens: number;
   addedAt: number;
@@ -107,6 +109,19 @@ export function createDiffEntry(args: {
 }): ContextEntry {
   return createEntry({
     type: 'diff',
+    content: args.content,
+    addedBy: args.addedBy ?? 'agent',
+  });
+}
+
+export function createWebEntry(args: {
+  url: string;
+  content: string;
+  addedBy?: 'user' | 'agent';
+}): ContextEntry {
+  return createEntry({
+    type: 'web',
+    url: args.url,
     content: args.content,
     addedBy: args.addedBy ?? 'agent',
   });

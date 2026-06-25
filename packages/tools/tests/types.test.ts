@@ -56,4 +56,16 @@ describe('Tool types', () => {
     };
     expect(r.contextEntries?.[0]?.type).toBe('file');
   });
+
+  it('ToolResult success can carry web contextEntries with url', () => {
+    const r: ToolResult = {
+      ok: true,
+      output: 'content',
+      contextEntries: [
+        { type: 'web', url: 'https://example.com', content: '# Title' },
+      ],
+    };
+    expect(r.contextEntries?.[0]?.type).toBe('web');
+    expect(r.contextEntries?.[0]?.url).toBe('https://example.com');
+  });
 });

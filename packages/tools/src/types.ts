@@ -24,9 +24,10 @@ export interface ToolCall {
 }
 
 export interface ContextEntryPayload {
-  type: 'file' | 'command-output' | 'snippet';
+  type: 'file' | 'command-output' | 'snippet' | 'web';
   path?: string;
   content: string;
+  url?: string;
 }
 
 export type ToolResult =

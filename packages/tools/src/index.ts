@@ -27,6 +27,8 @@ export { searchFilesTool, searchFilesDef } from './file/search.js';
 export type { SearchFilesArgs } from './file/search.js';
 export { shellExecTool, shellExecDef } from './shell/exec.js';
 export type { ShellExecArgs } from './shell/exec.js';
+export { webFetchTool, webFetchDef } from './web/fetch.js';
+export type { WebFetchArgs } from './web/fetch.js';
 
 import type { ToolDefinition, ToolCall, ToolResult } from './types.js';
 import { readFileTool, readFileDef } from './file/read.js';
@@ -37,6 +39,8 @@ import { searchFilesTool, searchFilesDef } from './file/search.js';
 import type { SearchFilesArgs } from './file/search.js';
 import { shellExecTool, shellExecDef } from './shell/exec.js';
 import type { ShellExecArgs } from './shell/exec.js';
+import { webFetchTool, webFetchDef } from './web/fetch.js';
+import type { WebFetchArgs } from './web/fetch.js';
 
 /**
  * Generic shape every tool handler satisfies at the dispatcher boundary.
@@ -83,6 +87,10 @@ export const TOOL_REGISTRY: Record<
   [shellExecDef.name]: {
     def: shellExecDef,
     handler: adaptToolHandler<ShellExecArgs>(shellExecTool),
+  },
+  [webFetchDef.name]: {
+    def: webFetchDef,
+    handler: adaptToolHandler<WebFetchArgs>(webFetchTool),
   },
 };
 
