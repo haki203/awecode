@@ -210,32 +210,75 @@ export async function runChatLoop(
           arguments: call.arguments,
         });
         opts.onToolResult?.(call.name, toolResult);
+
+        // Route structured contextEntries (web/browser-snapshot/image) into
+        // typed ContextEntry records so they show up in the context panel,
+        // survive compaction, and round-trip through resume. Image entries
+        // are additionally surfaced as a multimodal image part below.
         const toolResultStr = JSON.stringify(toolResult);
         opts.context.addToolResult({
           toolName: call.name,
           content: toolResultStr,
         });
+        if (toolResult.ok && toolResult.contextEntries && toolResult.contextEntries.length > 0) {
+          opts.context.addToolContextEntries(call.name, toolResult.contextEntries);
+        }
         fireContextUpdate();
         // AI SDK v6 models a tool message as `ToolModelMessage` whose content is
         // an array of `ToolResultPart` entries (not a bare string). Each part's
         // `output` is a `ToolResultOutput` discriminated union; we serialise the
         // awecode `ToolResult` into a `text`-shaped output so the structured
         // success/error payload round-trips to the model as JSON-encoded text.
-        // Prefer the provider-assigned `toolCallId` (required by OpenAI /
-        // Anthropic for correlation); fall back to a synthetic id for the mock
-        // test which doesn't supply one.
+        // Image contextEntries get an additional `image` part so vision-capable
+        // providers receive the actual pixels instead of a base64 string blob.
         const toolCallId = call.id ?? `call-${iter}-${call.name}`;
-        messages.push({
-          role: 'tool',
-          content: [
-            {
-              type: 'tool-result',
-              toolCallId,
-              toolName: call.name,
-              output: { type: 'text', value: toolResultStr },
-            },
-          ],
-        });
+        const parts: Array<{
+          type: 'tool-result';
+          toolCallId: string;
+          toolName: string;
+          output:
+            | { type: 'text'; value: string }
+            | {
+                type: 'content';
+                value: Array<{ type: 'text'; text: string } | { type: 'image-data'; data: string; mediaType: string }>;
+              };
+        }> = [
+          {
+            type: 'tool-result',
+            toolCallId,
+            toolName: call.name,
+            output: { type: 'text', value: toolResultStr },
+          },
+        ];
+        if (toolResult.ok && toolResult.contextEntries) {
+          for (const ce of toolResult.contextEntries) {
+            if (ce.type === 'image' && ce.base64) {
+              // Surface the image as a structured content part so vision-capable
+              // providers (OpenAI, Anthropic, Google) receive the actual pixels
+              // rather than a base64 blob embedded in text. AI SDK v6
+              // ToolResultOutput discriminated union: a single tool result may
+              // carry multiple output shapes, but each `output` is itself a
+              // single union member — so we emit a separate `output: {type:'content'}`
+              // part alongside the text output, both under the same toolCallId.
+              parts.push({
+                type: 'tool-result',
+                toolCallId,
+                toolName: call.name,
+                output: {
+                  type: 'content',
+                  value: [
+                    {
+                      type: 'image-data',
+                      data: ce.base64,
+                      mediaType: ce.mimeType ?? 'image/jpeg',
+                    },
+                  ],
+                },
+              });
+            }
+          }
+        }
+        messages.push({ role: 'tool', content: parts });
       }
     }
 

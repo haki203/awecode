@@ -36,6 +36,9 @@ const KNOWN_ENTRY_TYPES: ReadonlySet<ContextEntryType> = new Set([
   'tool-result',
   'diff',
   'repo-map',
+  'web',
+  'browser-snapshot',
+  'image',
 ]);
 
 function recordsToEntries(records: ContextEntryRecord[]): ContextEntry[] {

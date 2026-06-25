@@ -21,6 +21,9 @@ import {
   createUserMessageEntry,
   createAssistantMessageEntry,
   createToolResultEntry,
+  createWebEntry,
+  createBrowserSnapshotEntry,
+  createImageEntry,
 } from './entry.js';
 
 export interface AddFileArgs {
@@ -75,6 +78,82 @@ export class ContextManager {
     const entry = createToolResultEntry(args);
     this.entries.push(entry);
     return entry;
+  }
+
+  /**
+   * Route a tool's structured `contextEntries` payload into typed ContextEntry
+   * records. Each payload type maps to its matching createXxxEntry helper so
+   * the context panel, compaction, and resume paths all see the right type.
+   * Unrecognised payload types fall back to a snippet-style command-output
+   * entry (mirrors the resume fallback for unknown types).
+   *
+   * Returns the created entries in order, for callers that want to also emit
+   * them as multimodal parts to the LLM (see chat.ts image handling).
+   */
+  addToolContextEntries(
+    toolName: string,
+    payloads: Array<{
+      type: string;
+      content: string;
+      path?: string;
+      url?: string;
+      mimeType?: 'image/png' | 'image/webp' | 'image/jpeg';
+      base64?: string;
+    }>,
+  ): ContextEntry[] {
+    const created: ContextEntry[] = [];
+    for (const p of payloads) {
+      let entry: ContextEntry;
+      switch (p.type) {
+        case 'file':
+          entry = createFileEntry({
+            path: p.path ?? toolName,
+            content: p.content,
+            addedBy: 'agent',
+          });
+          break;
+        case 'command-output':
+          entry = createCommandOutputEntry({ content: p.content, addedBy: 'agent' });
+          break;
+        case 'web':
+          entry = createWebEntry({
+            url: p.url ?? '',
+            content: p.content,
+            addedBy: 'agent',
+          });
+          break;
+        case 'browser-snapshot':
+          entry = createBrowserSnapshotEntry({
+            url: p.url ?? '',
+            content: p.content,
+            addedBy: 'agent',
+          });
+          break;
+        case 'image':
+          entry = createImageEntry({
+            // image payloads may carry mimeType jpeg (real codec) — coerce to
+            // the supported union; the data URL in `content` keeps the exact
+            // mime so downstream consumers decode correctly.
+            mimeType: (p.mimeType === 'image/webp' ? 'image/webp' : 'image/png') as
+              | 'image/png'
+              | 'image/webp',
+            base64: p.base64 ?? '',
+            url: p.url,
+            addedBy: 'agent',
+          });
+          break;
+        default:
+          // snippet / unknown → store as command-output so it still counts
+          // toward the context budget and survives compaction.
+          entry = createCommandOutputEntry({
+            content: `[${p.type}] ${p.content}`,
+            addedBy: 'agent',
+          });
+      }
+      this.entries.push(entry);
+      created.push(entry);
+    }
+    return created;
   }
 
   removeEntry(id: string): boolean {

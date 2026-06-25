@@ -20,20 +20,31 @@ import {
 } from '../src/index.js';
 
 describe('tool registry', () => {
-  it('registers 5 built-in tools', () => {
+  it('registers all built-in tools', () => {
     const names = Object.keys(TOOL_REGISTRY);
     expect(names).toContain('read_file');
     expect(names).toContain('list_files');
     expect(names).toContain('search_files');
     expect(names).toContain('shell_exec');
     expect(names).toContain('web_fetch');
-    expect(names).toHaveLength(5);
+    expect(names).toContain('browser_session_open');
+    expect(names).toContain('browser_navigate');
+    expect(names).toContain('browser_screenshot');
+    expect(names).toHaveLength(13);
   });
 
   it('listToolDefinitions returns all definitions', () => {
     const defs = listToolDefinitions();
-    expect(defs).toHaveLength(5);
+    expect(defs).toHaveLength(13);
     expect(defs.map((d) => d.name).sort()).toEqual([
+      'browser_click',
+      'browser_navigate',
+      'browser_screenshot',
+      'browser_scroll',
+      'browser_session_close',
+      'browser_session_open',
+      'browser_snapshot',
+      'browser_type',
       'list_files',
       'read_file',
       'search_files',

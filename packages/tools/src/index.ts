@@ -29,6 +29,41 @@ export { shellExecTool, shellExecDef } from './shell/exec.js';
 export type { ShellExecArgs } from './shell/exec.js';
 export { webFetchTool, webFetchDef } from './web/fetch.js';
 export type { WebFetchArgs } from './web/fetch.js';
+export {
+  browserSessionOpenTool,
+  browserSessionCloseTool,
+  browserNavigateTool,
+  browserClickTool,
+  browserTypeTool,
+  browserScrollTool,
+  browserSnapshotTool,
+  browserScreenshotTool,
+  browserSessionOpenDef,
+  browserSessionCloseDef,
+  browserNavigateDef,
+  browserClickDef,
+  browserTypeDef,
+  browserScrollDef,
+  browserSnapshotDef,
+  browserScreenshotDef,
+} from './browser/tools.js';
+export type {
+  BrowserSessionOpenArgs,
+  BrowserSessionCloseArgs,
+  BrowserNavigateArgs,
+  BrowserClickArgs,
+  BrowserTypeArgs,
+  BrowserScrollArgs,
+  BrowserSnapshotArgs,
+  BrowserScreenshotArgs,
+} from './browser/tools.js';
+// BrowserSession + dispose helpers are exported for the agent layer to own
+// the Chromium lifecycle (open on first browser tool, dispose on session end).
+// Internal helpers like setBrowserSession / BROWSER_TOOL_HANDLERS are NOT
+// re-exported — they are an implementation detail of the tool registry.
+export { BrowserSession, disposeBrowserSession } from './browser/session.js';
+export { resolveViewport, VIEWPORT_PRESETS, DEFAULT_VIEWPORT } from './browser/viewport.js';
+export type { Viewport } from './browser/viewport.js';
 
 import type { ToolDefinition, ToolCall, ToolResult } from './types.js';
 import { readFileTool, readFileDef } from './file/read.js';
@@ -41,6 +76,35 @@ import { shellExecTool, shellExecDef } from './shell/exec.js';
 import type { ShellExecArgs } from './shell/exec.js';
 import { webFetchTool, webFetchDef } from './web/fetch.js';
 import type { WebFetchArgs } from './web/fetch.js';
+import {
+  browserSessionOpenDef,
+  browserSessionCloseDef,
+  browserNavigateDef,
+  browserClickDef,
+  browserTypeDef,
+  browserScrollDef,
+  browserSnapshotDef,
+  browserScreenshotDef,
+  BROWSER_TOOL_HANDLERS,
+} from './browser/tools.js';
+
+const browserRegistryEntries: Record<string, { def: ToolDefinition; handler: ToolHandler }> =
+  {};
+for (const def of [
+  browserSessionOpenDef,
+  browserSessionCloseDef,
+  browserNavigateDef,
+  browserClickDef,
+  browserTypeDef,
+  browserScrollDef,
+  browserSnapshotDef,
+  browserScreenshotDef,
+]) {
+  browserRegistryEntries[def.name] = {
+    def,
+    handler: BROWSER_TOOL_HANDLERS[def.name]!,
+  };
+}
 
 /**
  * Generic shape every tool handler satisfies at the dispatcher boundary.
@@ -92,6 +156,7 @@ export const TOOL_REGISTRY: Record<
     def: webFetchDef,
     handler: adaptToolHandler<WebFetchArgs>(webFetchTool),
   },
+  ...browserRegistryEntries,
 };
 
 export function listToolDefinitions(): ToolDefinition[] {

@@ -22,6 +22,8 @@ export {
   createToolResultEntry,
   createDiffEntry,
   createWebEntry,
+  createBrowserSnapshotEntry,
+  createImageEntry,
 } from './context/entry.js';
 
 export { ContextManager } from './context/manager.js';

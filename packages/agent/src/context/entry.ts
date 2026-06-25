@@ -25,7 +25,9 @@ export type ContextEntryType =
   | 'tool-result'
   | 'diff'
   | 'repo-map'
-  | 'web';
+  | 'web'
+  | 'browser-snapshot'
+  | 'image';
 
 export interface ContextEntry {
   id: string;
@@ -33,6 +35,8 @@ export interface ContextEntry {
   path?: string;
   lines?: { start: number; end: number };
   url?: string;
+  mimeType?: 'image/png' | 'image/webp' | 'image/jpeg';
+  base64?: string;
   content: string;
   tokens: number;
   addedAt: number;
@@ -125,4 +129,39 @@ export function createWebEntry(args: {
     content: args.content,
     addedBy: args.addedBy ?? 'agent',
   });
+}
+
+export function createBrowserSnapshotEntry(args: {
+  url: string;
+  content: string;
+  addedBy?: 'user' | 'agent';
+}): ContextEntry {
+  return createEntry({
+    type: 'browser-snapshot',
+    url: args.url,
+    content: args.content,
+    addedBy: args.addedBy ?? 'agent',
+  });
+}
+
+export function createImageEntry(args: {
+  mimeType: 'image/png' | 'image/webp' | 'image/jpeg';
+  base64: string;
+  url?: string;
+  addedBy?: 'user' | 'agent';
+}): ContextEntry {
+  // Images cost tokens proportional to their dimension, not their byte length.
+  // gpt-tokenizer counts base64 as text, which drastically overestimates vision
+  // tokens. We store the data URI as `content` for serialization simplicity and
+  // let downstream consumers (context panel, compaction) treat it as opaque.
+  return {
+    ...createEntry({
+      type: 'image',
+      content: `data:${args.mimeType};base64,${args.base64}`,
+      addedBy: args.addedBy ?? 'agent',
+    }),
+    mimeType: args.mimeType,
+    base64: args.base64,
+    url: args.url,
+  };
 }

@@ -245,6 +245,7 @@ __metadata:
     "@types/turndown": "npm:^5.0.6"
     cheerio: "npm:^1.0.0"
     fast-glob: "npm:^3.3.3"
+    playwright-core: "npm:^1.61.1"
     tsup: "npm:^8.5.1"
     turndown: "npm:^7.2.0"
     turndown-plugin-gfm: "npm:^1.0.2"
@@ -7525,6 +7526,15 @@ __metadata:
     mlly: "npm:^1.7.4"
     pathe: "npm:^2.0.1"
   checksum: 10c0/19e6cb8b66dcc66c89f2344aecfa47f2431c988cfa3366bdfdcfb1dd6695f87dcce37fbd90fe9d1605e2f4440b77f391e83c23255347c35cf84e7fd774d7fcea
+  languageName: node
+  linkType: hard
+
+"playwright-core@npm:^1.61.1":
+  version: 1.61.1
+  resolution: "playwright-core@npm:1.61.1"
+  bin:
+    playwright-core: cli.js
+  checksum: 10c0/c28896ba82a602182e240ed4f9c467fb0dd9cb57d510f8aba9f25183fe1cde3a0105725a29baffa4157fe885bbb11e228032a2aad0424111584fde45303f07bd
   languageName: node
   linkType: hard
 

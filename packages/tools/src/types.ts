@@ -24,10 +24,12 @@ export interface ToolCall {
 }
 
 export interface ContextEntryPayload {
-  type: 'file' | 'command-output' | 'snippet' | 'web';
+  type: 'file' | 'command-output' | 'snippet' | 'web' | 'browser-snapshot' | 'image';
   path?: string;
   content: string;
   url?: string;
+  mimeType?: 'image/png' | 'image/webp' | 'image/jpeg';
+  base64?: string;
 }
 
 export type ToolResult =
